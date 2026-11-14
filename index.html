@@ -62,11 +62,12 @@ details.all{margin-top:10px;border-top:1px solid var(--line);padding-top:6px}det
 .gl .me{font-weight:700;color:var(--p2)}.gl .no{color:var(--mut)}.gl small{font-weight:700}
 tr[data-p]{cursor:pointer}tr[data-p]:active{background:var(--bg)}
 .ph .mi{font-size:.92rem}.ph small{display:block}.sum{display:flex;gap:14px;flex-wrap:wrap;color:var(--mut);font-size:.9rem;margin:6px 0}
+#hb{display:flex;gap:8px}#hb[hidden]{display:none}
 details summary{cursor:pointer;margin:10px 0;color:var(--mut)}
 </style>
 </head>
 <body>
-<header><h1><img src="icon.svg" alt="" width="34" height="34">מלך התחזיות</h1><button id="gear" aria-label="הגדרות" hidden>⚙️</button></header>
+<header><h1><img src="icon.svg" alt="" width="34" height="34">מלך התחזיות</h1><div id="hb" hidden><button id="rbtn" aria-label="חוקי המשחק">📖</button><button id="sbtn" aria-label="צלילים">🔊</button><button id="gear" aria-label="הגדרות">⚙️</button></div></header>
 <main id="app"><div class="center">טוען…</div></main>
 <div id="msg"></div>
 <div id="sheet" hidden><div class="back"></div><div class="panel" id="panel"></div></div>
@@ -100,6 +101,31 @@ function sfx(k){
     else if(k==='chime'){tone(988,0,.2);tone(1319,.18,.32)}
   }catch{}
 }
+// ---- voice messages played when a player breaks a rule (files listed in config.js VOICE_FILES) ----
+const VF=()=>C.VOICE_FILES||{};
+const hasVoices=()=>Object.values(VF()).some(Boolean);
+const voiceOn=()=>{try{return localStorage.getItem('voice')!=='0'}catch{return true}};
+const setVoice=v=>{try{localStorage.setItem('voice',v?'1':'0')}catch{}};
+const vcache={};
+function voice(k){
+  const f=VF()[k]||VF().generic;
+  if(f&&voiceOn()){
+    try{const key=VF()[k]?k:'generic',a=vcache[key]||(vcache[key]=new Audio(f));a.currentTime=0;a.play().catch(()=>sfx('err'));return}catch{}
+  }
+  sfx('err');
+}
+function fail(e){
+  const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));
+  toast(errText(e),'none');voice(k||'generic');
+}
+// browsers only allow sound after a tap: on the first tap, unlock the audio engine and the voice files
+function unlockAudio(){
+  document.removeEventListener('click',unlockAudio,true);
+  try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();AC.resume()}catch{}
+  for(const [k,f] of Object.entries(VF())){if(!f||vcache[k])continue;const a=vcache[k]=new Audio(f);a.muted=true;a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false}).catch(()=>{a.muted=false})}
+}
+document.addEventListener('click',unlockAudio,true);
+function updSoundIcon(){const b=document.getElementById('sbtn');if(b)b.textContent=(sfxOn()||(hasVoices()&&voiceOn())||musicPlaying())?'🔊':'🔇'}
 // ---- background music (optional: set MUSIC_URL in config.js) ----
 let music=null;
 const musicPref=()=>{try{return localStorage.getItem('music')==='1'}catch{return false}};
@@ -110,8 +136,8 @@ function musicSet(on){
   if(on)music.play().then(()=>{try{localStorage.setItem('music','1')}catch{}}).catch(()=>toast('לא ניתן להשמיע את המוזיקה','err'));
   else{music.pause();try{localStorage.setItem('music','0')}catch{}}
 }
-const musicFirstTap=e=>{if(e.target.closest('#sheet'))return;document.removeEventListener('pointerdown',musicFirstTap);if(musicPref()&&C.MUSIC_URL&&!music)musicSet(true)};
-document.addEventListener('pointerdown',musicFirstTap);
+const musicFirstTap=e=>{if(e.target.closest('#sheet'))return;document.removeEventListener('click',musicFirstTap);if(musicPref()&&C.MUSIC_URL&&!music)musicSet(true)};
+document.addEventListener('click',musicFirstTap);
 if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data?.type==='push')sfx('chime')});
 const errText=e=>{const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));if(k==='score_taken'&&e.details)return 'התוצאה הזו כבר נבחרה על ידי '+e.details;return k?ERR[k]:'משהו השתבש, נסה שוב'+(e.message?' ('+String(e.message).slice(0,50)+')':'')};
 
@@ -122,11 +148,11 @@ sb.auth.onAuthStateChange((ev,s)=>{if(ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED
 
 async function boot(session){
   if(session&&me&&me.id===session.user.id&&me.is_approved)return;   // already running for this user: don't re-render
-  if(!session){me=null;document.getElementById('gear').hidden=true;return login()}
+  if(!session){me=null;document.getElementById('hb').hidden=true;return login()}
   const {data:p}=await sb.from('profiles').select('*').eq('id',session.user.id).maybeSingle();
   me=p;if(!me){app.innerHTML='<div class="center">יוצר פרופיל…</div>';return setTimeout(async()=>boot((await sb.auth.getSession()).data.session),1500)}
   if(!me.is_approved)return join();
-  document.getElementById('gear').hidden=false;
+  document.getElementById('hb').hidden=false;updSoundIcon();
   await load();PS=await pushState();render();resync();
 }
 function login(){
@@ -151,7 +177,7 @@ function join(){
   document.getElementById('out').onclick=()=>sb.auth.signOut();
   document.getElementById('j').onclick=async()=>{
     const {error}=await sb.rpc('join_with_code',{p_code:document.getElementById('code').value.trim()});
-    if(error)return toast(errText(error),'err');
+    if(error)return fail(error);
     boot((await sb.auth.getSession()).data.session);
   };
 }
@@ -218,7 +244,7 @@ app.addEventListener('click',e=>{
 app.addEventListener('submit',async e=>{
   const f=e.target.closest('form.g');if(!f)return;e.preventDefault();
   const {error}=await sb.rpc('submit_guess',{p_match_id:Number(f.dataset.m),p_home:Number(f.h.value),p_away:Number(f.a.value)});
-  if(error)return toast(errText(error),'err');
+  if(error)return fail(error);
   toast('הניחוש נשמר ✓');await load();render();
 });
 app.addEventListener('click',async e=>{
@@ -226,7 +252,7 @@ app.addEventListener('click',async e=>{
   const [id,n]=b.dataset.b.split(':').map(Number);
   if(!confirm(n?`לבחור תוספת ניקוד של ${n} נקודות? ההחלטה סופית.`:'להמשיך בלי בוסט? ההחלטה סופית.'))return;
   const {error}=await sb.rpc('set_boost',{p_match_id:id,p_amount:n});
-  if(error)return toast(errText(error),'err');
+  if(error)return fail(error);
   toast('הבוסט נקבע ✓','boost');await load();render();
 });
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -293,7 +319,12 @@ function menuHtml(v){
   if(v.startsWith('p:'))return playerHtml(v.slice(2));
   if(v==='name')return `<div class="mi"><b>שם תצוגה</b><button class="lnk" data-s="main">חזרה</button></div><small>כך תופיע בטבלה ובניחושים (2 עד 30 תווים)</small><input type="text" id="nm" maxlength="30" value="${esc(me.display_name)}"><button class="pri" data-s="namesave">שמירה</button>`;
   if(v==='admin')return '<div class="mi"><b>ניהול</b><button class="lnk" data-s="main">חזרה</button></div><div class="center">טוען…</div>';
-  if(v==='rules')return `<div class="mi"><b>חוקי המשחק</b><button class="lnk" data-s="main">חזרה</button></div>${RULES}`;
+  if(v==='rules')return `<div class="mi"><b>חוקי המשחק</b><button class="lnk" data-s="close">סגירה</button></div>${RULES}`;
+  if(v==='sound')return `<div class="mi"><b>צלילים</b><button class="lnk" data-s="close">סגירה</button></div>
+  <div class="mi"><span>🔊 צלילי האפליקציה</span><button class="pri" data-s="sfx">${sfxOn()?'השתקה':'הפעלה'}</button></div>
+  ${hasVoices()?`<div class="mi"><span>🗣️ הודעות קוליות (כשמפרים חוק)</span><button class="pri" data-s="voice">${voiceOn()?'השתקה':'הפעלה'}</button></div>`:''}
+  ${C.MUSIC_URL?`<div class="mi"><span>🎵 מוזיקת רקע</span><button class="pri" data-s="music">${musicPlaying()?'עצירה':'הפעלה'}</button></div>`:''}
+  <small class="hint">צלילי התראות (כשהאפליקציה סגורה) נקבעים בהגדרות הטלפון.</small>`;
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
   const th=document.documentElement.dataset.theme==='home'?'בית':'חוץ';
   let notif;
@@ -305,16 +336,15 @@ function menuHtml(v){
   return `<div class="mi"><b>הגדרות</b><button class="lnk" data-s="close">סגירה</button></div>
   <div class="mi"><span>🔔 התראות</span>${notif}</div>
   ${standalone?'':`<div class="mi"><span>📲 התקנת אפליקציה</span>${inst}</div>`}
-  <div class="mi"><span>🔊 צלילים: ${sfxOn()?'פועלים':'כבויים'}</span><button class="pri" data-s="sfx">${sfxOn()?'השתקה':'הפעלה'}</button></div>
-  ${C.MUSIC_URL?`<div class="mi"><span>🎵 מוזיקת רקע</span><button class="pri" data-s="music">${musicPlaying()?'עצירה':'הפעלה'}</button></div>`:''}
   <div class="mi"><span>🎨 ערכת נושא: ${th}</span><button class="pri" data-s="theme">החלפה</button></div>
-  <div class="mi"><span>📖 חוקי המשחק</span><button class="pri" data-s="rules">הצגה</button></div>
   <div class="mi"><span>✏️ שם תצוגה: <b>${esc(me.display_name)}</b></span><button class="pri" data-s="name">עריכה</button></div>
   ${me.is_admin?'<div class="mi"><span>🛠️ ניהול</span><button class="pri" data-s="admin">פתיחה</button></div>':''}
   <div class="mi"><span></span><button class="lnk" data-s="out">התנתקות</button></div>`;
 }
 document.addEventListener('click',async e=>{
   if(e.target.closest('#gear'))return sheet('main');
+  if(e.target.closest('#rbtn'))return sheet('rules');
+  if(e.target.closest('#sbtn'))return sheet('sound');
   if(e.target.classList.contains('back'))return sheet(null);
   const b=e.target.closest('[data-s]');if(!b)return;
   const a=b.dataset.s;
@@ -323,8 +353,9 @@ document.addEventListener('click',async e=>{
   else if(a==='theme'){toggleTheme();sheet('main')}
   else if(a==='out'){sheet(null);sb.auth.signOut()}
   else if(a==='inst'&&dip){dip.prompt();await dip.userChoice;dip=null;sheet('main')}
-  else if(a==='sfx'){const on=!sfxOn();setSfx(on);if(on)sfx('ok');sheet('main')}
-  else if(a==='music'){musicSet(!musicPlaying());setTimeout(()=>sheet('main'),150)}
+  else if(a==='sfx'){const on=!sfxOn();setSfx(on);if(on)sfx('ok');updSoundIcon();sheet('sound')}
+  else if(a==='voice'){setVoice(!voiceOn());updSoundIcon();sheet('sound')}
+  else if(a==='music'){musicSet(!musicPlaying());setTimeout(()=>{updSoundIcon();sheet('sound')},200)}
   else if(a==='pon')await pushOn();
   else if(a==='poff')await pushOff();
 });
@@ -369,14 +400,14 @@ document.addEventListener('click',async e=>{
     const c=prompt('קוד הזמנה חדש (8-40 תווים: אותיות באנגלית, ספרות ומקפים)');if(!c)return;
     r=await sb.rpc('admin_set_invite_code',{p_code:c.trim()});
   }
-  if(r?.error)return toast(errText(r.error),'err');
+  if(r?.error)return fail(r.error);
   toast('בוצע ✓');await load();render();adminLoad();
 });
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-s="namesave"]');if(!b)return;
   const v=document.getElementById('nm').value.trim();
   const {error}=await sb.rpc('update_display_name',{p_name:v});
-  if(error)return toast(errText(error),'err');
+  if(error)return fail(error);
   me.display_name=v;toast('השם עודכן ✓');await load();render();sheet('main');
 });
 sb.auth.getSession().then(({data})=>boot(data.session));
