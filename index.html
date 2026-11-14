@@ -57,6 +57,11 @@ button.lnk{background:none;border:0;color:var(--mut);text-decoration:underline;f
 .ad h4{margin:16px 0 4px;color:var(--p2)}.ad small{display:block}.ad .mi{font-size:.92rem}.ad .mi>div{min-width:0;overflow-wrap:anywhere}
 button.dng{background:#b03a2e;color:#fff;border:0;border-radius:10px;padding:6px 12px;font:inherit}
 .ok{color:#18884a}.bad{color:#c0392b}
+details.all{margin-top:10px;border-top:1px solid var(--line);padding-top:6px}details.all summary{margin:2px 0 6px;font-size:.88rem}
+.gl{display:grid;grid-template-columns:1fr 1fr;gap:2px 16px}.gl div{display:flex;justify-content:space-between;gap:6px;font-size:.9rem;padding:4px 0;border-bottom:1px dashed var(--line)}
+.gl .me{font-weight:700;color:var(--p2)}.gl .no{color:var(--mut)}.gl small{font-weight:700}
+tr[data-p]{cursor:pointer}tr[data-p]:active{background:var(--bg)}
+.ph .mi{font-size:.92rem}.ph small{display:block}.sum{display:flex;gap:14px;flex-wrap:wrap;color:var(--mut);font-size:.9rem;margin:6px 0}
 details summary{cursor:pointer;margin:10px 0;color:var(--mut)}
 </style>
 </head>
@@ -79,8 +84,36 @@ const team=n=>window.teamHe?window.teamHe(n):n;
 const ST={SCHEDULED:'עתידי',TIMED:'עתידי',IN_PLAY:'במשחק',PAUSED:'מחצית',FINISHED:'הסתיים',POSTPONED:'נדחה',CANCELLED:'בוטל',SUSPENDED:'הופסק'};
 const ERR={score_taken:'התוצאה הזו כבר נבחרה על ידי מישהו אחר',edit_limit_reached:'ניצלת את שלוש העריכות למשחק הזה',guess_window_closed:'זמן הניחוש הסתיים',match_closed:'המשחק סגור לניחושים',not_member:'צריך להצטרף עם קוד הזמנה',invalid_code:'קוד הזמנה שגוי',boost_locked:'זמן קביעת הבוסט הסתיים',boost_already_set:'הבוסט כבר נקבע',not_booster:'אתה לא הבוסטר במשחק הזה',invalid_amount:'ערך לא תקין',invalid_name:'השם חייב להיות בין 2 ל-30 תווים',forbidden:'אין הרשאה',cannot_remove_self:'אי אפשר להסיר את עצמך',invalid_code_format:'הקוד חייב להכיל 8-40 אותיות באנגלית, ספרות ומקפים בלבד'};
 let me=null,tab='games',D={},PS=null;
-const toast=t=>{const m=document.getElementById('msg');m.textContent=t;m.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>m.style.display='none',3500)};
-const errText=e=>{const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));return k?ERR[k]:'משהו השתבש, נסה שוב'+(e.message?' ('+String(e.message).slice(0,50)+')':'')};
+const toast=(t,k)=>{const m=document.getElementById('msg');m.textContent=t;m.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>m.style.display='none',3500);k=k||(String(t).includes('✓')?'ok':null);if(k)sfx(k)};
+// ---- sounds (generated in the browser, no audio files) ----
+let AC=null;
+const sfxOn=()=>{try{return localStorage.getItem('sfx')!=='0'}catch{return true}};
+const setSfx=v=>{try{localStorage.setItem('sfx',v?'1':'0')}catch{}};
+function tone(f,t0,d,type='sine',vol=.18){const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+t0;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d+.05)}
+function sfx(k){
+  if(!sfxOn())return;
+  try{
+    AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();
+    if(k==='ok'){tone(659,0,.14);tone(880,.12,.22)}
+    else if(k==='err'){tone(220,0,.18,'square',.08);tone(165,.16,.26,'square',.08)}
+    else if(k==='boost'){[523,659,784,1047].forEach((f,i)=>tone(f,i*.1,.26))}
+    else if(k==='chime'){tone(988,0,.2);tone(1319,.18,.32)}
+  }catch{}
+}
+// ---- background music (optional: set MUSIC_URL in config.js) ----
+let music=null;
+const musicPref=()=>{try{return localStorage.getItem('music')==='1'}catch{return false}};
+const musicPlaying=()=>!!music&&!music.paused;
+function musicSet(on){
+  if(!C.MUSIC_URL)return;
+  if(!music){music=new Audio(C.MUSIC_URL);music.loop=true;music.volume=.4}
+  if(on)music.play().then(()=>{try{localStorage.setItem('music','1')}catch{}}).catch(()=>toast('לא ניתן להשמיע את המוזיקה','err'));
+  else{music.pause();try{localStorage.setItem('music','0')}catch{}}
+}
+const musicFirstTap=e=>{if(e.target.closest('#sheet'))return;document.removeEventListener('pointerdown',musicFirstTap);if(musicPref()&&C.MUSIC_URL&&!music)musicSet(true)};
+document.addEventListener('pointerdown',musicFirstTap);
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data?.type==='push')sfx('chime')});
+const errText=e=>{const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));if(k==='score_taken'&&e.details)return 'התוצאה הזו כבר נבחרה על ידי '+e.details;return k?ERR[k]:'משהו השתבש, נסה שוב'+(e.message?' ('+String(e.message).slice(0,50)+')':'')};
 
 function toggleTheme(){const h=document.documentElement,t=h.dataset.theme==='home'?'away':'home';h.dataset.theme=t;try{localStorage.setItem('theme',t)}catch{}}
 try{const t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch{}
@@ -118,7 +151,7 @@ function join(){
   document.getElementById('out').onclick=()=>sb.auth.signOut();
   document.getElementById('j').onclick=async()=>{
     const {error}=await sb.rpc('join_with_code',{p_code:document.getElementById('code').value.trim()});
-    if(error)return toast(errText(error));
+    if(error)return toast(errText(error),'err');
     boot((await sb.auth.getSession()).data.session);
   };
 }
@@ -126,7 +159,7 @@ async function load(){
   const [m,g,l,s]=await Promise.all([
     sb.from('matches').select('*, booster:profiles!matches_booster_id_fkey(display_name)').order('utc_date'),
     sb.from('guesses').select('*, p:profiles!guesses_user_id_fkey(display_name)'),
-    sb.from('points_ledger').select('match_id,amount,note,kind').eq('user_id',me.id),
+    sb.from('points_ledger').select('season_id,user_id,match_id,amount,note,kind'),
     sb.from('standings').select('*').order('points',{ascending:false}).order('exact_hits',{ascending:false})]);
   const bad=[m,g,l,s].find(r=>r.error);if(bad){console.error(bad.error);toast('שגיאה בטעינת הנתונים '+(bad.error.code||''))}
   D={matches:m.data||[],guesses:g.data||[],ledger:l.data||[],standings:s.data||[]};
@@ -141,8 +174,8 @@ function card(m){
   const live=['IN_PLAY','PAUSED','SCHEDULED','TIMED'].includes(m.status);
   const open=!m.voided&&live&&(now<ko||(now<ko+3e5&&!(m.live_home>0||m.live_away>0)&&!m.first_goal_at));
   const sc=m.live_home!=null&&now>=ko?`${m.live_home}:${m.live_away}`:'vs';
-  const pt=D.ledger.find(x=>x.match_id===m.id&&x.kind==='guess');
-  const others=now>=ko-36e5?D.guesses.filter(x=>x.match_id===m.id&&x.user_id!==me.id):[];
+  const pt=D.ledger.find(x=>x.user_id===me.id&&x.match_id===m.id&&x.kind==='guess');
+  const reveal=now>=ko-36e5;
   const left=3-(mine?.edit_count??0);
   let h=`<div class="card"><div class="meta"><span>${m.competition==='CL'?'ליגת האלופות':'לה ליגה'}${m.matchday?' · מחזור '+m.matchday:''}</span><span>${m.voided?'בוטל':ST[m.status]||m.status}</span></div>
   <div class="meta"><span>${fmt(m.utc_date)}</span>${m.booster?`<span>בוסטר: ${esc(m.booster.display_name)}${m.boost_amount>0&&(now>=ko-36e5||m.booster_id===me.id)?` <span class="tag">+${m.boost_amount}</span>`:''}</span>`:''}</div>
@@ -154,7 +187,14 @@ function card(m){
   }else if(mine){
     h+=`<div style="text-align:center">הניחוש שלך: <b>${mine.home_goals}:${mine.away_goals}</b>${pt?` · <span class="pts ${pt.amount>=0?'pos':'neg'}">${pt.amount>0?'+':''}${pt.amount}</span>`:''}</div>`;
   }else if(m.status==='FINISHED'||now>=ko){h+='<div class="hint">לא ניחשת במשחק הזה</div>'}
-  if(others.length)h+=`<div class="oth">${others.map(o=>`${esc(o.p?.display_name)}: <b>${o.home_goals}:${o.away_goals}</b>`).join(' · ')}</div>`;
+  if(reveal){
+    const mem=D.standings.filter(r=>r.season_id===m.season_id),gs=D.guesses.filter(x=>x.match_id===m.id);
+    const list=mem.map(u=>({u,g:gs.find(x=>x.user_id===u.user_id),pt:D.ledger.find(x=>x.user_id===u.user_id&&x.match_id===m.id&&x.kind==='guess')}));
+    list.sort((a,b)=>(b.g?1:0)-(a.g?1:0)||String(a.u.display_name).localeCompare(String(b.u.display_name),'he'));
+    h+=`<details class="all"${m.status==='FINISHED'?'':' open'}><summary>ניחושי כולם (${gs.length} מתוך ${mem.length})</summary><div class="gl">${list.map(({u,g,pt})=>`<div class="${u.user_id===me.id?'me':''}${g?'':' no'}"><span>${esc(u.display_name)}${m.booster_id===u.user_id?' 👑':''}</span><span>${g?`<b>${g.home_goals}:${g.away_goals}</b>`:'—'}${pt?` <small class="${pt.amount>=0?'pos':'neg'}">${pt.amount>0?'+':''}${pt.amount}</small>`:''}</span></div>`).join('')}</div></details>`;
+  }else if(!m.voided&&['SCHEDULED','TIMED'].includes(m.status)){
+    h+=`<div class="hint">ניחושי כולם ייחשפו בשעה ${new Intl.DateTimeFormat('he-IL',{timeStyle:'short',timeZone:'Asia/Jerusalem'}).format(new Date(ko-36e5))}</div>`;
+  }
   return h+'</div>';
 }
 function render(){
@@ -165,18 +205,20 @@ function render(){
     body=(up.map(card).join('')||'<div class="center">אין משחקים קרובים</div>')+(past.length?`<details><summary>משחקים שהסתיימו (${past.length})</summary>${past.map(card).join('')}</details>`:'');
   }else{
     const sid=D.matches[0]?.season_id,rows=D.standings.filter(r=>r.season_id===sid);
-    body=`<div class="card"><table><tr><th>#</th><th>שחקן</th><th>נק׳</th><th>מדויקים</th></tr>${rows.map((r,i)=>`<tr><td>${i+1}</td><td class="n">${esc(r.display_name)}${r.user_id===me.id?' (אתה)':''}</td><td class="n">${r.points}</td><td>${r.exact_hits}</td></tr>`).join('')}</table></div>`;
+    const st=uid=>{const L=D.ledger.filter(x=>x.user_id===uid&&x.season_id===sid&&x.kind==='guess');return{n:L.length,ex:L.filter(x=>x.note==='exact').length,dr:L.filter(x=>x.note==='direction').length}};
+    body=`<div class="card"><table><tr><th>#</th><th>שחקן</th><th>נק׳</th><th>ניחושים</th><th>מדויקים</th><th>כיוון</th></tr>${rows.map((r,i)=>{const t=st(r.user_id);return `<tr data-p="${r.user_id}"><td>${i+1}</td><td class="n">${esc(r.display_name)}${r.user_id===me.id?' (אתה)':''}</td><td class="n">${r.points}</td><td>${t.n}</td><td>${t.ex}</td><td>${t.dr}</td></tr>`}).join('')}</table><div class="hint">לחצו על שחקן כדי לראות את הניחושים שלו. "ניחושים" = משחקים שהסתיימו וניחשו בהם.</div></div>`;
   }
   app.innerHTML=`<nav><button data-t="games" class="${tab==='games'?'on':''}">משחקים</button><button data-t="table" class="${tab==='table'?'on':''}">טבלה</button></nav>${body}`;
 }
 app.addEventListener('click',e=>{
   const t=e.target.closest('[data-t]');if(t){tab=t.dataset.t;render()}
+  const pr=e.target.closest('[data-p]');if(pr)sheet('p:'+pr.dataset.p);
   if(e.target.id==='out')sb.auth.signOut();
 });
 app.addEventListener('submit',async e=>{
   const f=e.target.closest('form.g');if(!f)return;e.preventDefault();
   const {error}=await sb.rpc('submit_guess',{p_match_id:Number(f.dataset.m),p_home:Number(f.h.value),p_away:Number(f.a.value)});
-  if(error)return toast(errText(error));
+  if(error)return toast(errText(error),'err');
   toast('הניחוש נשמר ✓');await load();render();
 });
 app.addEventListener('click',async e=>{
@@ -184,8 +226,8 @@ app.addEventListener('click',async e=>{
   const [id,n]=b.dataset.b.split(':').map(Number);
   if(!confirm(n?`לבחור תוספת ניקוד של ${n} נקודות? ההחלטה סופית.`:'להמשיך בלי בוסט? ההחלטה סופית.'))return;
   const {error}=await sb.rpc('set_boost',{p_match_id:id,p_amount:n});
-  if(error)return toast(errText(error));
-  toast('הבוסט נקבע ✓');await load();render();
+  if(error)return toast(errText(error),'err');
+  toast('הבוסט נקבע ✓','boost');await load();render();
 });
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 let dip=null;
@@ -232,7 +274,23 @@ function sheet(v){
   if(v)document.getElementById('panel').innerHTML=menuHtml(v);
   if(v==='admin')adminLoad();
 }
+const NOTE={exact:'מדויק',direction:'כיוון',miss:'פספוס',grace_invalid:'נפסל (אחרי שער)'};
+function playerHtml(id){
+  const u=D.standings.find(r=>r.user_id===id);
+  if(!u)return '<div class="mi"><b>שחקן</b><button class="lnk" data-s="close">סגירה</button></div>';
+  const L=D.ledger.filter(x=>x.user_id===id&&x.kind==='guess');
+  const ms=D.matches.filter(m=>!m.voided&&D.guesses.some(g=>g.match_id===m.id&&g.user_id===id)).reverse();
+  return `<div class="ph"><div class="mi"><b>${esc(u.display_name)}</b><button class="lnk" data-s="close">סגירה</button></div>
+  <div class="sum"><span>נקודות: <b>${u.points}</b></span><span>ניחושים: <b>${L.length}</b></span><span>מדויקים: <b>${L.filter(x=>x.note==='exact').length}</b></span><span>כיוון: <b>${L.filter(x=>x.note==='direction').length}</b></span></div>
+  ${ms.map(m=>{
+    const g=D.guesses.find(x=>x.match_id===m.id&&x.user_id===id);
+    const rows=D.ledger.filter(x=>x.user_id===id&&x.match_id===m.id);
+    const net=rows.reduce((a,x)=>a+x.amount,0),gr=rows.find(x=>x.kind==='guess');
+    const res=m.status==='FINISHED'&&m.reg_home!=null?`${m.reg_home}:${m.reg_away}`:(m.live_home!=null?`${m.live_home}:${m.live_away}`:'—');
+    return `<div class="mi"><div>${esc(team(m.home_team))} - ${esc(team(m.away_team))}${m.booster_id===id?' 👑':''}<small>${fmt(m.utc_date)} · תוצאה: ${res}${gr?' · '+(NOTE[gr.note]||''):''}</small></div><div style="text-align:end"><b>${g.home_goals}:${g.away_goals}</b>${rows.length?`<small class="pts ${net>=0?'pos':'neg'}">${net>0?'+':''}${net}</small>`:'<small>ממתין</small>'}</div></div>`}).join('')||'<div class="hint">עדיין אין ניחושים להצגה</div>'}</div>`;
+}
 function menuHtml(v){
+  if(v.startsWith('p:'))return playerHtml(v.slice(2));
   if(v==='name')return `<div class="mi"><b>שם תצוגה</b><button class="lnk" data-s="main">חזרה</button></div><small>כך תופיע בטבלה ובניחושים (2 עד 30 תווים)</small><input type="text" id="nm" maxlength="30" value="${esc(me.display_name)}"><button class="pri" data-s="namesave">שמירה</button>`;
   if(v==='admin')return '<div class="mi"><b>ניהול</b><button class="lnk" data-s="main">חזרה</button></div><div class="center">טוען…</div>';
   if(v==='rules')return `<div class="mi"><b>חוקי המשחק</b><button class="lnk" data-s="main">חזרה</button></div>${RULES}`;
@@ -247,6 +305,8 @@ function menuHtml(v){
   return `<div class="mi"><b>הגדרות</b><button class="lnk" data-s="close">סגירה</button></div>
   <div class="mi"><span>🔔 התראות</span>${notif}</div>
   ${standalone?'':`<div class="mi"><span>📲 התקנת אפליקציה</span>${inst}</div>`}
+  <div class="mi"><span>🔊 צלילים: ${sfxOn()?'פועלים':'כבויים'}</span><button class="pri" data-s="sfx">${sfxOn()?'השתקה':'הפעלה'}</button></div>
+  ${C.MUSIC_URL?`<div class="mi"><span>🎵 מוזיקת רקע</span><button class="pri" data-s="music">${musicPlaying()?'עצירה':'הפעלה'}</button></div>`:''}
   <div class="mi"><span>🎨 ערכת נושא: ${th}</span><button class="pri" data-s="theme">החלפה</button></div>
   <div class="mi"><span>📖 חוקי המשחק</span><button class="pri" data-s="rules">הצגה</button></div>
   <div class="mi"><span>✏️ שם תצוגה: <b>${esc(me.display_name)}</b></span><button class="pri" data-s="name">עריכה</button></div>
@@ -263,6 +323,8 @@ document.addEventListener('click',async e=>{
   else if(a==='theme'){toggleTheme();sheet('main')}
   else if(a==='out'){sheet(null);sb.auth.signOut()}
   else if(a==='inst'&&dip){dip.prompt();await dip.userChoice;dip=null;sheet('main')}
+  else if(a==='sfx'){const on=!sfxOn();setSfx(on);if(on)sfx('ok');sheet('main')}
+  else if(a==='music'){musicSet(!musicPlaying());setTimeout(()=>sheet('main'),150)}
   else if(a==='pon')await pushOn();
   else if(a==='poff')await pushOff();
 });
@@ -307,14 +369,14 @@ document.addEventListener('click',async e=>{
     const c=prompt('קוד הזמנה חדש (8-40 תווים: אותיות באנגלית, ספרות ומקפים)');if(!c)return;
     r=await sb.rpc('admin_set_invite_code',{p_code:c.trim()});
   }
-  if(r?.error)return toast(errText(r.error));
+  if(r?.error)return toast(errText(r.error),'err');
   toast('בוצע ✓');await load();render();adminLoad();
 });
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-s="namesave"]');if(!b)return;
   const v=document.getElementById('nm').value.trim();
   const {error}=await sb.rpc('update_display_name',{p_name:v});
-  if(error)return toast(errText(error));
+  if(error)return toast(errText(error),'err');
   me.display_name=v;toast('השם עודכן ✓');await load();render();sheet('main');
 });
 sb.auth.getSession().then(({data})=>boot(data.session));

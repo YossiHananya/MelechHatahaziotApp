@@ -1,6 +1,6 @@
 // Service worker: network-first for the app's own files (so updates arrive fast),
 // cached copy as an offline fallback. API calls and CDN scripts are never touched.
-const CACHE = "melech-v5";
+const CACHE = "melech-v6";
 const SHELL = [
   "./",
   "index.html",
@@ -34,6 +34,11 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== "GET" || u.origin !== location.origin) return;
+  if (
+    e.request.headers.has("range") ||
+    /\.(mp3|m4a|ogg|wav|aac)$/i.test(u.pathname)
+  )
+    return; // let audio stream directly
   e.respondWith(
     fetch(e.request)
       .then((r) => {
@@ -56,15 +61,18 @@ self.addEventListener("push", (e) => {
     /* ignore */
   }
   e.waitUntil(
-    self.registration.showNotification(d.title || "מלך התחזיות", {
-      body: d.body || "",
-      icon: "icon-192.png",
-      badge: "icon-192.png",
-      tag: d.tag,
-      dir: "rtl",
-      lang: "he",
-      data: { url: d.url || "./" },
-    }),
+    self.registration
+      .showNotification(d.title || "מלך התחזיות", {
+        body: d.body || "",
+        icon: "icon-192.png",
+        badge: "icon-192.png",
+        tag: d.tag,
+        dir: "rtl",
+        lang: "he",
+        data: { url: d.url || "./" },
+      })
+      .then(() => clients.matchAll({ type: "window" }))
+      .then((list) => list.forEach((c) => c.postMessage({ type: "push" }))),
   );
 });
 self.addEventListener("notificationclick", (e) => {
