@@ -34,6 +34,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px 6px;text-align:start
 td.n{font-weight:700}
 #msg{position:fixed;inset-inline:16px;bottom:calc(16px + env(safe-area-inset-bottom));background:#222;color:#fff;padding:12px 14px;border-radius:12px;display:none;z-index:9;text-align:center}
 .center{text-align:center;padding:40px 10px}.center input{font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;margin:10px 0;width:100%;max-width:260px;text-align:center;background:var(--card);color:var(--ink)}
+.boost{background:var(--bg);border:2px dashed var(--acc);border-radius:12px;padding:10px;margin:8px 0;text-align:center;font-size:.92rem}.bs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}.bs button{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:700}.rules h3{margin:16px 0 4px;color:var(--p2)}.rules h3:first-child{margin-top:0}.rules li,.rules p{margin:4px 0}
 details summary{cursor:pointer;margin:10px 0;color:var(--mut)}
 </style>
 </head>
@@ -49,7 +50,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const fmt=d=>new Intl.DateTimeFormat('he-IL',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jerusalem'}).format(new Date(d));
 const team=n=>/Barcelona/i.test(n)?'ברצלונה':n;
 const ST={SCHEDULED:'עתידי',TIMED:'עתידי',IN_PLAY:'במשחק',PAUSED:'מחצית',FINISHED:'הסתיים',POSTPONED:'נדחה',CANCELLED:'בוטל',SUSPENDED:'הופסק'};
-const ERR={score_taken:'התוצאה הזו כבר נבחרה על ידי מישהו אחר',edit_limit_reached:'ניצלת את שלוש העריכות למשחק הזה',guess_window_closed:'זמן הניחוש הסתיים',match_closed:'המשחק סגור לניחושים',not_member:'צריך להצטרף עם קוד הזמנה',invalid_code:'קוד הזמנה שגוי'};
+const ERR={score_taken:'התוצאה הזו כבר נבחרה על ידי מישהו אחר',edit_limit_reached:'ניצלת את שלוש העריכות למשחק הזה',guess_window_closed:'זמן הניחוש הסתיים',match_closed:'המשחק סגור לניחושים',not_member:'צריך להצטרף עם קוד הזמנה',invalid_code:'קוד הזמנה שגוי',boost_locked:'זמן קביעת הבוסט הסתיים',boost_already_set:'הבוסט כבר נקבע',not_booster:'אתה לא הבוסטר במשחק הזה',invalid_amount:'ערך לא תקין'};
 let me=null,tab='games',D={};
 const toast=t=>{const m=document.getElementById('msg');m.textContent=t;m.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>m.style.display='none',3500)};
 const errText=e=>{const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));return k?ERR[k]:'משהו השתבש, נסה שוב'};
@@ -87,6 +88,10 @@ async function load(){
     sb.from('standings').select('*').order('points',{ascending:false}).order('exact_hits',{ascending:false})]);
   D={matches:m.data||[],guesses:g.data||[],ledger:l.data||[],standings:s.data||[]};
 }
+const RULES=`<div class="card rules"><h3>הניחוש</h3><ul><li>מנחשים את תוצאת 90 הדקות (בלי הארכה ופנדלים) של משחקי ברצלונה בלה ליגה ובליגת האלופות.</li><li>אפשר לערוך ניחוש עד 3 פעמים, עד שריקת הפתיחה.</li><li>אי אפשר לבחור תוצאה שכבר נבחרה על ידי מישהו אחר באותו משחק.</li><li>הניחושים של כולם נחשפים שעה לפני המשחק.</li></ul>
+<h3>ניקוד</h3><ul><li>משחק רגיל שווה 3 נקודות. תוצאה מדויקת: כל הנקודות. כיוון נכון (ניצחון או תיקו): חצי, מעוגל כלפי מטה. אחרת: 0.</li><li>בכל משחק יש בוסטר, לפי סדר ההצטרפות. עד שעה לפני המשחק הוא קובע סטייק של 1 עד 10 נקודות, או מדלג (0). בלי החלטה אין בוסט.</li><li>סטייק S מעלה את שווי המשחק לכולם ל-3+S. הסטייק יורד מהבוסטר בכל מקרה, ונקודות הבוסטר במשחק מוכפלות פי 2.</li></ul>
+<h3>חלון חסד</h3><ul><li>אפשר לנחש עד 5 דקות אחרי הפתיחה, רק כל עוד התוצאה 0:0 ורק לפני השער הראשון.</li><li>תוצאה מדויקת: כל הנקודות. כיוון נכון: 0. כיוון שגוי: מינוס כל נקודות המדויק.</li></ul>
+<h3>משחק שנדחה או בוטל</h3><p>המשחק מבוטל, לא נספרות נקודות והסטייק של הבוסטר מוחזר.</p></div>`;
 function card(m){
   const now=Date.now(),ko=Date.parse(m.utc_date);
   const mine=D.guesses.find(x=>x.match_id===m.id&&x.user_id===me.id);
@@ -97,8 +102,9 @@ function card(m){
   const others=now>=ko-36e5?D.guesses.filter(x=>x.match_id===m.id&&x.user_id!==me.id):[];
   const left=3-(mine?.edit_count??0);
   let h=`<div class="card"><div class="meta"><span>${m.competition==='CL'?'ליגת האלופות':'לה ליגה'}${m.matchday?' · מחזור '+m.matchday:''}</span><span>${m.voided?'בוטל':ST[m.status]||m.status}</span></div>
-  <div class="meta"><span>${fmt(m.utc_date)}</span>${m.booster?`<span>בוסטר: ${esc(m.booster.display_name)}${m.boost_amount>0&&now>=ko-36e5?` <span class="tag">+${m.boost_amount}</span>`:''}</span>`:''}</div>
+  <div class="meta"><span>${fmt(m.utc_date)}</span>${m.booster?`<span>בוסטר: ${esc(m.booster.display_name)}${m.boost_amount>0&&(now>=ko-36e5||m.booster_id===me.id)?` <span class="tag">+${m.boost_amount}</span>`:''}</span>`:''}</div>
   <div class="row"><b>${esc(team(m.home_team))}</b><span class="sc">${sc}</span><b>${esc(team(m.away_team))}</b></div>`;
+  if(m.booster_id===me.id&&!m.voided&&m.boost_decided_at==null&&now<ko-36e5&&['SCHEDULED','TIMED'].includes(m.status))h+=`<div class="boost"><b>אתה הבוסטר במשחק הזה!</b><div>בחר סטייק (0 = בלי בוסט). ההחלטה סופית ונסגרת שעה לפני המשחק.</div><div class="bs">${[0,1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" data-b="${m.id}:${n}">${n}</button>`).join('')}</div></div>`;
   if(open){
     h+=`<form class="g" data-m="${m.id}"><input type="number" name="h" min="0" max="20" inputmode="numeric" required value="${mine?.home_goals??''}"><span>:</span><input type="number" name="a" min="0" max="20" inputmode="numeric" required value="${mine?.away_goals??''}"><button>${mine?'עדכון':'שמירה'}</button></form>
     <div class="hint">${now>=ko?'חלון חסד: טעות בכיוון עולה בנקודות מינוס · ':''}${mine?`נותרו ${left} עריכות`:'אפשר לערוך עד 3 פעמים'}</div>`;
@@ -114,11 +120,11 @@ function render(){
   let body='';
   if(tab==='games'){
     body=(up.map(card).join('')||'<div class="center">אין משחקים קרובים</div>')+(past.length?`<details><summary>משחקים שהסתיימו (${past.length})</summary>${past.map(card).join('')}</details>`:'');
-  }else{
+  }else if(tab==='rules'){body=RULES}else{
     const sid=D.matches[0]?.season_id,rows=D.standings.filter(r=>r.season_id===sid);
     body=`<div class="card"><table><tr><th>#</th><th>שחקן</th><th>נק׳</th><th>מדויקים</th></tr>${rows.map((r,i)=>`<tr><td>${i+1}</td><td class="n">${esc(r.display_name)}${r.user_id===me.id?' (אתה)':''}</td><td class="n">${r.points}</td><td>${r.exact_hits}</td></tr>`).join('')}</table></div>`;
   }
-  app.innerHTML=`<nav><button data-t="games" class="${tab==='games'?'on':''}">משחקים</button><button data-t="table" class="${tab==='table'?'on':''}">טבלה</button></nav>${body}<div class="center"><button id="out" style="background:none;border:0;color:var(--mut);text-decoration:underline">התנתקות (${esc(me.display_name)})</button></div>`;
+  app.innerHTML=`<nav><button data-t="games" class="${tab==='games'?'on':''}">משחקים</button><button data-t="table" class="${tab==='table'?'on':''}">טבלה</button><button data-t="rules" class="${tab==='rules'?'on':''}">חוקים</button></nav>${body}<div class="center"><button id="out" style="background:none;border:0;color:var(--mut);text-decoration:underline">התנתקות (${esc(me.display_name)})</button></div>`;
 }
 app.addEventListener('click',e=>{
   const t=e.target.closest('[data-t]');if(t){tab=t.dataset.t;render()}
@@ -129,6 +135,14 @@ app.addEventListener('submit',async e=>{
   const {error}=await sb.rpc('submit_guess',{p_match_id:Number(f.dataset.m),p_home:Number(f.h.value),p_away:Number(f.a.value)});
   if(error)return toast(errText(error));
   toast('הניחוש נשמר ✓');await load();render();
+});
+app.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-b]');if(!b)return;
+  const [id,n]=b.dataset.b.split(':').map(Number);
+  if(!confirm(n?`לשים סטייק של ${n} נקודות? ההחלטה סופית.`:'להמשיך בלי בוסט? ההחלטה סופית.'))return;
+  const {error}=await sb.rpc('set_boost',{p_match_id:id,p_amount:n});
+  if(error)return toast(errText(error));
+  toast('הבוסט נקבע ✓');await load();render();
 });
 sb.auth.getSession().then(({data})=>boot(data.session));
 </script>
