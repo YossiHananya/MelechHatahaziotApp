@@ -5,4 +5,6 @@ window.APP_CONFIG = {
   SUPABASE_KEY: "sb_publishable_8VpPZdTpb4MIyjgKGZ3o4g_gusWcXpW", // publishable key only, never the secret key
   VAPID_PUBLIC_KEY:
     "BBQrcLFL8f7Mwu5s6O2qHE_q-bGY_HeMvJRL1h2Pni3BdQJwgFe4DzhA4NOf_w1ZCKsu8DXdQaXmhIRCGfwJU_Q", // the PUBLIC push key
+  GOOGLE_CLIENT_ID:
+    "38599321289-nejcjg52rae4e53lbiuu6ifhst6ovqfk.apps.googleusercontent.com", // Google OAuth Web client ID (public) - fixes sign-in inside the iPhone home-screen app
 };

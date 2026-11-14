@@ -66,6 +66,8 @@ details summary{cursor:pointer;margin:10px 0;color:var(--mut)}
 <div id="msg"></div>
 <div id="sheet" hidden><div class="back"></div><div class="panel" id="panel"></div></div>
 <script src="config.js"></script>
+<script src="teams.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script>
 const C=window.APP_CONFIG||{};
@@ -73,19 +75,20 @@ const sb=supabase.createClient(C.SUPABASE_URL,C.SUPABASE_KEY);
 const app=document.getElementById('app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=d=>new Intl.DateTimeFormat('he-IL',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jerusalem'}).format(new Date(d));
-const team=n=>/Barcelona/i.test(n)?'ברצלונה':n;
+const team=n=>window.teamHe?window.teamHe(n):n;
 const ST={SCHEDULED:'עתידי',TIMED:'עתידי',IN_PLAY:'במשחק',PAUSED:'מחצית',FINISHED:'הסתיים',POSTPONED:'נדחה',CANCELLED:'בוטל',SUSPENDED:'הופסק'};
 const ERR={score_taken:'התוצאה הזו כבר נבחרה על ידי מישהו אחר',edit_limit_reached:'ניצלת את שלוש העריכות למשחק הזה',guess_window_closed:'זמן הניחוש הסתיים',match_closed:'המשחק סגור לניחושים',not_member:'צריך להצטרף עם קוד הזמנה',invalid_code:'קוד הזמנה שגוי',boost_locked:'זמן קביעת הבוסט הסתיים',boost_already_set:'הבוסט כבר נקבע',not_booster:'אתה לא הבוסטר במשחק הזה',invalid_amount:'ערך לא תקין',invalid_name:'השם חייב להיות בין 2 ל-30 תווים',forbidden:'אין הרשאה',cannot_remove_self:'אי אפשר להסיר את עצמך',invalid_code_format:'הקוד חייב להכיל 8-40 אותיות באנגלית, ספרות ומקפים בלבד'};
 let me=null,tab='games',D={},PS=null;
 const toast=t=>{const m=document.getElementById('msg');m.textContent=t;m.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>m.style.display='none',3500)};
-const errText=e=>{const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));return k?ERR[k]:'משהו השתבש, נסה שוב'};
+const errText=e=>{const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));return k?ERR[k]:'משהו השתבש, נסה שוב'+(e.message?' ('+String(e.message).slice(0,50)+')':'')};
 
 function toggleTheme(){const h=document.documentElement,t=h.dataset.theme==='home'?'away':'home';h.dataset.theme=t;try{localStorage.setItem('theme',t)}catch{}}
 try{const t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch{}
 
-sb.auth.onAuthStateChange((_e,s)=>setTimeout(()=>boot(s),0));
+sb.auth.onAuthStateChange((ev,s)=>{if(ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED')return;setTimeout(()=>boot(s),0)});
 
 async function boot(session){
+  if(session&&me&&me.id===session.user.id&&me.is_approved)return;   // already running for this user: don't re-render
   if(!session){me=null;document.getElementById('gear').hidden=true;return login()}
   const {data:p}=await sb.from('profiles').select('*').eq('id',session.user.id).maybeSingle();
   me=p;if(!me){app.innerHTML='<div class="center">יוצר פרופיל…</div>';return setTimeout(async()=>boot((await sb.auth.getSession()).data.session),1500)}
@@ -94,8 +97,21 @@ async function boot(session){
   await load();PS=await pushState();render();resync();
 }
 function login(){
-  app.innerHTML='<div class="center"><h2>ברוכים הבאים</h2><p>נחשו תוצאות של ברצלונה והתחרו בחברים.</p><button class="pri" id="go">התחברות עם Google</button></div>';
+  const gis=!!C.GOOGLE_CLIENT_ID;
+  app.innerHTML=`<div class="center"><h2>ברוכים הבאים</h2><p>נחשו תוצאות של ברצלונה והתחרו בחברים.</p>${gis?'<div id="gbtn" style="display:flex;justify-content:center;min-height:44px"></div><p><button class="lnk" id="go">הכפתור לא עובד? התחברות חלופית</button></p>':'<button class="pri" id="go">התחברות עם Google</button>'}</div>`;
   document.getElementById('go').onclick=()=>sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
+  if(gis)initGoogle();
+}
+async function initGoogle(tries=0){
+  const box=document.getElementById('gbtn');if(!box)return;
+  if(!window.google?.accounts?.id){if(tries<40)setTimeout(()=>initGoogle(tries+1),250);return}
+  const raw=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+  const hashed=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  google.accounts.id.initialize({client_id:C.GOOGLE_CLIENT_ID,nonce:hashed,ux_mode:'popup',callback:async r=>{
+    const {error}=await sb.auth.signInWithIdToken({provider:'google',token:r.credential,nonce:raw});
+    if(error){console.error(error);toast('ההתחברות נכשלה')}
+  }});
+  google.accounts.id.renderButton(box,{theme:'outline',size:'large',text:'signin_with',shape:'pill',locale:'he'});
 }
 function join(){
   app.innerHTML=`<div class="center"><h2>היי ${esc(me.display_name)}</h2><p>הכניסו את קוד ההזמנה מהקבוצה כדי להצטרף.</p><input id="code" placeholder="קוד הזמנה" autocomplete="off"><br><button class="pri" id="j">הצטרפות</button> <button id="out" style="background:none;border:0;color:var(--mut);text-decoration:underline">התנתקות</button></div>`;
