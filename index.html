@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#004d98">
+<meta name="theme-color" content="#3f6394">
 <title>מלך התחזיות</title>
 <style>
-:root{--bg:#f6f3ee;--card:#fff;--ink:#1b1a22;--mut:#6d6a78;--line:#e3dfd6;--p1:#004d98;--p2:#a50044;--acc:#edbb00}
-[data-theme=away]{--bg:#17121f;--card:#241c30;--ink:#f1ecf8;--mut:#a79fb8;--line:#372d47;--p1:#0b0b0f;--p2:#5b2a86;--acc:#d9904f}
+:root{--bg:#f6f3ee;--card:#fff;--ink:#1b1a22;--mut:#6d6a78;--line:#e3dfd6;--p1:#3f6394;--p2:#8e4a68;--acc:#e4c466}
+[data-theme=away]{--bg:#17121f;--card:#241c30;--ink:#f1ecf8;--mut:#a79fb8;--line:#372d47;--p1:#2b2438;--p2:#59457a;--acc:#d3a06f}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
-header{background:repeating-linear-gradient(90deg,var(--p1) 0 28px,var(--p2) 28px 56px);padding:calc(14px + env(safe-area-inset-top)) 16px 14px;display:flex;align-items:center;justify-content:space-between}
+header{background:linear-gradient(100deg,var(--p1),var(--p2));padding:calc(14px + env(safe-area-inset-top)) 16px 14px;display:flex;align-items:center;justify-content:space-between}
 header h1{margin:0;font-size:1.35rem;color:var(--acc);text-shadow:0 1px 3px #000a}
 header button{background:#0006;color:#fff;border:0;border-radius:10px;padding:6px 10px;font-size:1.1rem}
 main{max-width:640px;margin:0 auto;padding:14px}
@@ -34,7 +34,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px 6px;text-align:start
 td.n{font-weight:700}
 #msg{position:fixed;inset-inline:16px;bottom:calc(16px + env(safe-area-inset-bottom));background:#222;color:#fff;padding:12px 14px;border-radius:12px;display:none;z-index:9;text-align:center}
 .center{text-align:center;padding:40px 10px}.center input{font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;margin:10px 0;width:100%;max-width:260px;text-align:center;background:var(--card);color:var(--ink)}
-.boost{background:var(--bg);border:2px dashed var(--acc);border-radius:12px;padding:10px;margin:8px 0;text-align:center;font-size:.92rem}.bs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}.bs button{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:700}.rules h3{margin:16px 0 4px;color:var(--p2)}.rules h3:first-child{margin-top:0}.rules li,.rules p{margin:4px 0}
+.boost{background:var(--bg);border:2px dashed var(--acc);border-radius:12px;padding:10px;margin:8px 0;text-align:center;font-size:.92rem}.bs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}.bs button{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:700}.rules h3{margin:16px 0 4px;color:var(--p2)}.rules h3:first-child{margin-top:0}.rules li,.rules p{margin:4px 0}.rules ol,.rules ul{padding-inline-start:22px;margin:4px 0}
 details summary{cursor:pointer;margin:10px 0;color:var(--mut)}
 </style>
 </head>
@@ -89,9 +89,9 @@ async function load(){
   D={matches:m.data||[],guesses:g.data||[],ledger:l.data||[],standings:s.data||[]};
 }
 const RULES=`<div class="card rules"><h3>הניחוש</h3><ul><li>מנחשים את תוצאת 90 הדקות (בלי הארכה ופנדלים) של משחקי ברצלונה בלה ליגה ובליגת האלופות.</li><li>אפשר לערוך ניחוש עד 3 פעמים, עד שריקת הפתיחה.</li><li>אי אפשר לבחור תוצאה שכבר נבחרה על ידי מישהו אחר באותו משחק.</li><li>הניחושים של כולם נחשפים שעה לפני המשחק.</li></ul>
-<h3>ניקוד</h3><ul><li>משחק רגיל שווה 3 נקודות. תוצאה מדויקת: כל הנקודות. כיוון נכון (ניצחון או תיקו): חצי, מעוגל כלפי מטה. אחרת: 0.</li><li>בכל משחק יש בוסטר, לפי סדר ההצטרפות. עד שעה לפני המשחק הוא קובע סטייק של 1 עד 10 נקודות, או מדלג (0). בלי החלטה אין בוסט.</li><li>סטייק S מעלה את שווי המשחק לכולם ל-3+S. הסטייק יורד מהבוסטר בכל מקרה, ונקודות הבוסטר במשחק מוכפלות פי 2.</li></ul>
+<h3>ניקוד</h3><ol><li>כל משחק שווה 3 נקודות.<ul><li>ניחוש מדויק של התוצאה מזכה בכל הנקודות.</li><li>ניחוש הכיוון הנכון בלבד (ניצחון, הפסד או תיקו) מזכה במחצית מהנקודות, מעוגלת כלפי מטה.</li><li>בכל מקרה אחר לא מתקבלות נקודות.</li></ul></li><li>לכל משחק מוגדר בוסטר, בהתאם לסדר ההצטרפות למשחק. עד שעה לפני תחילת המשחק, בעל הבוסטר יכול לבחור תוספת ניקוד של 1 עד 10 נקודות, או לוותר (0). אם לא בחר תוספת ניקוד, לא יופעל בוסט.</li><li>אם נבחרה תוספת ניקוד בגודל S, שווי המשחק גדל עבור כל המשתתפים ל־3+S נקודות. תוספת הניקוד מנוכה מבעל הבוסטר בכל מקרה, אך הנקודות שהוא צובר באותו משחק מוכפלות פי 2.</li></ol>
 <h3>חלון חסד</h3><ul><li>אפשר לנחש עד 5 דקות אחרי הפתיחה, רק כל עוד התוצאה 0:0 ורק לפני השער הראשון.</li><li>תוצאה מדויקת: כל הנקודות. כיוון נכון: 0. כיוון שגוי: מינוס כל נקודות המדויק.</li></ul>
-<h3>משחק שנדחה או בוטל</h3><p>המשחק מבוטל, לא נספרות נקודות והסטייק של הבוסטר מוחזר.</p></div>`;
+<h3>משחק שנדחה או בוטל</h3><p>המשחק מבוטל, לא נספרות נקודות ותוספת הניקוד של הבוסטר מוחזרת.</p></div>`;
 function card(m){
   const now=Date.now(),ko=Date.parse(m.utc_date);
   const mine=D.guesses.find(x=>x.match_id===m.id&&x.user_id===me.id);
@@ -104,7 +104,7 @@ function card(m){
   let h=`<div class="card"><div class="meta"><span>${m.competition==='CL'?'ליגת האלופות':'לה ליגה'}${m.matchday?' · מחזור '+m.matchday:''}</span><span>${m.voided?'בוטל':ST[m.status]||m.status}</span></div>
   <div class="meta"><span>${fmt(m.utc_date)}</span>${m.booster?`<span>בוסטר: ${esc(m.booster.display_name)}${m.boost_amount>0&&(now>=ko-36e5||m.booster_id===me.id)?` <span class="tag">+${m.boost_amount}</span>`:''}</span>`:''}</div>
   <div class="row"><b>${esc(team(m.home_team))}</b><span class="sc">${sc}</span><b>${esc(team(m.away_team))}</b></div>`;
-  if(m.booster_id===me.id&&!m.voided&&m.boost_decided_at==null&&now<ko-36e5&&['SCHEDULED','TIMED'].includes(m.status))h+=`<div class="boost"><b>אתה הבוסטר במשחק הזה!</b><div>בחר סטייק (0 = בלי בוסט). ההחלטה סופית ונסגרת שעה לפני המשחק.</div><div class="bs">${[0,1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" data-b="${m.id}:${n}">${n}</button>`).join('')}</div></div>`;
+  if(m.booster_id===me.id&&!m.voided&&m.boost_decided_at==null&&now<ko-36e5&&['SCHEDULED','TIMED'].includes(m.status))h+=`<div class="boost"><b>אתה הבוסטר במשחק הזה!</b><div>בחר תוספת ניקוד (0 = בלי בוסט). ההחלטה סופית ונסגרת שעה לפני המשחק.</div><div class="bs">${[0,1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" data-b="${m.id}:${n}">${n}</button>`).join('')}</div></div>`;
   if(open){
     h+=`<form class="g" data-m="${m.id}"><input type="number" name="h" min="0" max="20" inputmode="numeric" required value="${mine?.home_goals??''}"><span>:</span><input type="number" name="a" min="0" max="20" inputmode="numeric" required value="${mine?.away_goals??''}"><button>${mine?'עדכון':'שמירה'}</button></form>
     <div class="hint">${now>=ko?'חלון חסד: טעות בכיוון עולה בנקודות מינוס · ':''}${mine?`נותרו ${left} עריכות`:'אפשר לערוך עד 3 פעמים'}</div>`;
@@ -139,7 +139,7 @@ app.addEventListener('submit',async e=>{
 app.addEventListener('click',async e=>{
   const b=e.target.closest('[data-b]');if(!b)return;
   const [id,n]=b.dataset.b.split(':').map(Number);
-  if(!confirm(n?`לשים סטייק של ${n} נקודות? ההחלטה סופית.`:'להמשיך בלי בוסט? ההחלטה סופית.'))return;
+  if(!confirm(n?`לבחור תוספת ניקוד של ${n} נקודות? ההחלטה סופית.`:'להמשיך בלי בוסט? ההחלטה סופית.'))return;
   const {error}=await sb.rpc('set_boost',{p_match_id:id,p_amount:n});
   if(error)return toast(errText(error));
   toast('הבוסט נקבע ✓');await load();render();
