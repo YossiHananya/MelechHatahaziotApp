@@ -53,6 +53,10 @@ button.lnk{background:none;border:0;color:var(--mut);text-decoration:underline;f
 @keyframes down{from{transform:translateY(-16px);opacity:0}}
 .mi{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 2px;border-bottom:1px solid var(--line)}.mi:last-child{border:0}.mi small{color:var(--mut)}
 #sheet .rules{border:0;padding:6px 0;margin:0;animation:none}
+#sheet input[type=text]{font:inherit;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);width:100%;margin:6px 0}
+.ad h4{margin:16px 0 4px;color:var(--p2)}.ad small{display:block}.ad .mi{font-size:.92rem}.ad .mi>div{min-width:0;overflow-wrap:anywhere}
+button.dng{background:#b03a2e;color:#fff;border:0;border-radius:10px;padding:6px 12px;font:inherit}
+.ok{color:#18884a}.bad{color:#c0392b}
 details summary{cursor:pointer;margin:10px 0;color:var(--mut)}
 </style>
 </head>
@@ -71,7 +75,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const fmt=d=>new Intl.DateTimeFormat('he-IL',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jerusalem'}).format(new Date(d));
 const team=n=>/Barcelona/i.test(n)?'ברצלונה':n;
 const ST={SCHEDULED:'עתידי',TIMED:'עתידי',IN_PLAY:'במשחק',PAUSED:'מחצית',FINISHED:'הסתיים',POSTPONED:'נדחה',CANCELLED:'בוטל',SUSPENDED:'הופסק'};
-const ERR={score_taken:'התוצאה הזו כבר נבחרה על ידי מישהו אחר',edit_limit_reached:'ניצלת את שלוש העריכות למשחק הזה',guess_window_closed:'זמן הניחוש הסתיים',match_closed:'המשחק סגור לניחושים',not_member:'צריך להצטרף עם קוד הזמנה',invalid_code:'קוד הזמנה שגוי',boost_locked:'זמן קביעת הבוסט הסתיים',boost_already_set:'הבוסט כבר נקבע',not_booster:'אתה לא הבוסטר במשחק הזה',invalid_amount:'ערך לא תקין'};
+const ERR={score_taken:'התוצאה הזו כבר נבחרה על ידי מישהו אחר',edit_limit_reached:'ניצלת את שלוש העריכות למשחק הזה',guess_window_closed:'זמן הניחוש הסתיים',match_closed:'המשחק סגור לניחושים',not_member:'צריך להצטרף עם קוד הזמנה',invalid_code:'קוד הזמנה שגוי',boost_locked:'זמן קביעת הבוסט הסתיים',boost_already_set:'הבוסט כבר נקבע',not_booster:'אתה לא הבוסטר במשחק הזה',invalid_amount:'ערך לא תקין',invalid_name:'השם חייב להיות בין 2 ל-30 תווים',forbidden:'אין הרשאה',cannot_remove_self:'אי אפשר להסיר את עצמך',invalid_code_format:'הקוד חייב להכיל 8-40 אותיות באנגלית, ספרות ומקפים בלבד'};
 let me=null,tab='games',D={},PS=null;
 const toast=t=>{const m=document.getElementById('msg');m.textContent=t;m.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>m.style.display='none',3500)};
 const errText=e=>{const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));return k?ERR[k]:'משהו השתבש, נסה שוב'};
@@ -210,8 +214,11 @@ async function pushOff(){
 function sheet(v){
   const el=document.getElementById('sheet');el.hidden=!v;
   if(v)document.getElementById('panel').innerHTML=menuHtml(v);
+  if(v==='admin')adminLoad();
 }
 function menuHtml(v){
+  if(v==='name')return `<div class="mi"><b>שם תצוגה</b><button class="lnk" data-s="main">חזרה</button></div><small>כך תופיע בטבלה ובניחושים (2 עד 30 תווים)</small><input type="text" id="nm" maxlength="30" value="${esc(me.display_name)}"><button class="pri" data-s="namesave">שמירה</button>`;
+  if(v==='admin')return '<div class="mi"><b>ניהול</b><button class="lnk" data-s="main">חזרה</button></div><div class="center">טוען…</div>';
   if(v==='rules')return `<div class="mi"><b>חוקי המשחק</b><button class="lnk" data-s="main">חזרה</button></div>${RULES}`;
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
   const th=document.documentElement.dataset.theme==='home'?'בית':'חוץ';
@@ -226,7 +233,9 @@ function menuHtml(v){
   ${standalone?'':`<div class="mi"><span>📲 התקנת אפליקציה</span>${inst}</div>`}
   <div class="mi"><span>🎨 ערכת נושא: ${th}</span><button class="pri" data-s="theme">החלפה</button></div>
   <div class="mi"><span>📖 חוקי המשחק</span><button class="pri" data-s="rules">הצגה</button></div>
-  <div class="mi"><span>${esc(me.display_name)}</span><button class="lnk" data-s="out">התנתקות</button></div>`;
+  <div class="mi"><span>✏️ שם תצוגה: <b>${esc(me.display_name)}</b></span><button class="pri" data-s="name">עריכה</button></div>
+  ${me.is_admin?'<div class="mi"><span>🛠️ ניהול</span><button class="pri" data-s="admin">פתיחה</button></div>':''}
+  <div class="mi"><span></span><button class="lnk" data-s="out">התנתקות</button></div>`;
 }
 document.addEventListener('click',async e=>{
   if(e.target.closest('#gear'))return sheet('main');
@@ -234,12 +243,63 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-s]');if(!b)return;
   const a=b.dataset.s;
   if(a==='close')sheet(null);
-  else if(a==='main'||a==='rules')sheet(a);
+  else if(a==='main'||a==='rules'||a==='name'||a==='admin')sheet(a);
   else if(a==='theme'){toggleTheme();sheet('main')}
   else if(a==='out'){sheet(null);sb.auth.signOut()}
   else if(a==='inst'&&dip){dip.prompt();await dip.userChoice;dip=null;sheet('main')}
   else if(a==='pon')await pushOn();
   else if(a==='poff')await pushOff();
+});
+
+const dt=d=>d?new Intl.DateTimeFormat('he-IL',{dateStyle:'short',timeStyle:'short',timeZone:'Asia/Jerusalem'}).format(new Date(d)):'—';
+async function adminLoad(){
+  const panel=document.getElementById('panel');
+  const {data,error}=await sb.rpc('admin_overview');
+  if(error){console.error(error);panel.innerHTML=`<div class="mi"><b>ניהול</b><button class="lnk" data-s="main">חזרה</button></div><div class="center">${errText(error)}<br><small>האם הרצת את 004_admin_and_profile.sql?</small></div>`;return}
+  const ago=data.last_sync?Math.round((Date.now()-Date.parse(data.last_sync))/60000):null;
+  const syncOk=ago!==null&&ago<400;
+  const ms=data.members||[];
+  const open=D.matches.filter(m=>!m.voided&&m.status!=='FINISHED').slice(0,10);
+  const done=D.matches.filter(m=>!m.voided&&m.status==='FINISHED').slice(-3).reverse();
+  const mrow=m=>`<div class="mi"><div>${esc(team(m.home_team))} - ${esc(team(m.away_team))}<small>${dt(m.utc_date)} · ${ST[m.status]||m.status}${m.booster?' · בוסטר: '+esc(m.booster.display_name):''}</small></div><button class="dng" data-ad="void" data-id="${m.id}">ביטול</button></div>`;
+  panel.innerHTML=`<div class="ad"><div class="mi"><b>ניהול</b><button class="lnk" data-s="main">חזרה</button></div>
+  <h4>מצב המערכת</h4>
+  <div class="mi"><span>סנכרון משחקים אחרון</span><span class="${syncOk?'ok':'bad'}">${data.last_sync?'לפני '+ago+' דק׳':'אף פעם'}</span></div>
+  ${(data.cron||[]).map(c=>`<div class="mi"><div>${esc(c.jobname)}<small>${dt(c.start_time)}${c.message?' · '+esc(c.message):''}</small></div><span class="${c.status==='succeeded'?'ok':'bad'}">${esc(c.status)}</span></div>`).join('')||'<small>אין נתוני cron</small>'}
+  ${(data.http_recent||[]).length?`<small>תגובות HTTP אחרונות מהפונקציות: ${data.http_recent.map(h=>`<span class="${h.status_code===200?'ok':'bad'}">${h.status_code??'—'}</span>`).join(' ')}</small>`:''}
+  <h4>קוד הזמנה</h4>
+  <div class="mi"><b dir="ltr">${esc(data.invite_code)}</b><button class="pri" data-ad="code">שינוי</button></div>
+  <h4>משתתפים (${ms.length})</h4>
+  ${ms.map(u=>`<div class="mi"><div>${esc(u.name)}${u.admin?' 👑':''}<small dir="ltr">${esc(u.email)}</small><small>${u.approved?'חבר':'ממתין, לא הזין קוד'} · התראות: ${u.push>0?'כן':'לא'}</small></div><div>${u.id===me.id?'':`<button class="lnk" data-ad="appr" data-id="${u.id}" data-v="${u.approved?0:1}">${u.approved?'השעיה':'אישור'}</button> <button class="dng" data-ad="rm" data-id="${u.id}" data-n="${esc(u.name)}">הסרה</button>`}</div></div>`).join('')}
+  <h4>ביטול משחק (דחייה / הפסקה)</h4>
+  <small>מבטל את המשחק, מוחק ניקוד שחולק ומחזיר את תוספת הניקוד לבוסטר. אי אפשר לשחזר.</small>
+  ${open.map(mrow).join('')}${done.length?'<small>הסתיימו לאחרונה</small>'+done.map(mrow).join(''):''}
+  </div>`;
+}
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-ad]');if(!b)return;
+  const a=b.dataset.ad,id=b.dataset.id;let r;
+  if(a==='void'){
+    if(!confirm('לבטל את המשחק? הניקוד יימחק והבוסטר יקבל החזר. אי אפשר לשחזר.'))return;
+    r=await sb.rpc('void_match',{p_match_id:Number(id),p_reason:'admin'});
+  }else if(a==='rm'){
+    if(!confirm('להסיר את '+b.dataset.n+' לצמיתות? כל הניחושים והנקודות שלו יימחקו.'))return;
+    r=await sb.rpc('admin_remove_user',{p_user_id:id});
+  }else if(a==='appr'){
+    r=await sb.rpc('admin_set_approved',{p_user_id:id,p_approved:b.dataset.v==='1'});
+  }else if(a==='code'){
+    const c=prompt('קוד הזמנה חדש (8-40 תווים: אותיות באנגלית, ספרות ומקפים)');if(!c)return;
+    r=await sb.rpc('admin_set_invite_code',{p_code:c.trim()});
+  }
+  if(r?.error)return toast(errText(r.error));
+  toast('בוצע ✓');await load();render();adminLoad();
+});
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-s="namesave"]');if(!b)return;
+  const v=document.getElementById('nm').value.trim();
+  const {error}=await sb.rpc('update_display_name',{p_name:v});
+  if(error)return toast(errText(error));
+  me.display_name=v;toast('השם עודכן ✓');await load();render();sheet('main');
 });
 sb.auth.getSession().then(({data})=>boot(data.session));
 </script>
