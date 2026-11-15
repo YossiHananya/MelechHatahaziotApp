@@ -64,6 +64,15 @@ tr[data-p]{cursor:pointer}tr[data-p]:active{background:var(--bg)}
 .ph .mi{font-size:.92rem}.ph small{display:block}.sum{display:flex;gap:14px;flex-wrap:wrap;color:var(--mut);font-size:.9rem;margin:6px 0}
 #hb{display:flex;gap:8px}#hb[hidden]{display:none}
 details summary{cursor:pointer;margin:10px 0;color:var(--mut)}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.big{font-size:2.6rem;font-weight:800;text-align:center;letter-spacing:2px;color:var(--p2)}[data-theme=away] .big{color:var(--acc)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e53935;margin-inline-start:6px;vertical-align:middle;animation:blink 1.2s infinite}@keyframes blink{50%{opacity:.25}}
+.gr{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;margin:6px 0;border:1px solid var(--line);transition:background .4s,border-color .4s}
+.gr.exact{background:#18884a26;border-color:#18884a}.gr.direction{background:#d9a40024;border-color:#d9a400}.gr.miss{background:#c0392b14;border-color:#c0392b66}.gr.none{opacity:.6;border-style:dashed}
+.gr .gs{font-weight:700;font-size:1.1rem}.gr small{color:var(--mut)}.gr.me{box-shadow:inset 3px 0 0 var(--p2)}
+.lg{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;font-size:.8rem;color:var(--mut);margin:6px 0}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:4px;vertical-align:middle}
+.mv{font-size:.75rem;font-weight:700;margin-inline-start:4px}.up{color:#18884a}.dn{color:#c0392b}.prov{color:#18884a;font-size:.8rem;font-weight:700;margin-inline-start:4px}
+tr.chg td{animation:flash 1.2s ease}@keyframes flash{from{background:#e4c46655}}
 </style>
 </head>
 <body>
@@ -84,7 +93,7 @@ const fmt=d=>new Intl.DateTimeFormat('he-IL',{dateStyle:'medium',timeStyle:'shor
 const team=n=>window.teamHe?window.teamHe(n):n;
 const ST={SCHEDULED:'עתידי',TIMED:'עתידי',IN_PLAY:'במשחק',PAUSED:'מחצית',FINISHED:'הסתיים',POSTPONED:'נדחה',CANCELLED:'בוטל',SUSPENDED:'הופסק'};
 const ERR={guess_window_closed:'המשחק כבר התחיל, הניחושים נסגרו',match_closed:'המשחק סגור לניחושים',not_member:'צריך להצטרף עם קוד הזמנה',invalid_code:'קוד הזמנה שגוי',invalid_amount:'ערך לא תקין',pushups_deadline_passed:'הזמן לחלוקה עבר (המשחק הבא כבר התחיל)',pushups_already_distributed:'כבר חילקת את השכיבות האלה',pushups_over_limit:'חילקת יותר שכיבות ממה שמגיע לך',not_your_award:'השכיבות האלה לא שלך לחלק',invalid_count:'מספר לא תקין',invalid_name:'השם חייב להיות בין 2 ל-30 תווים',forbidden:'אין הרשאה',cannot_remove_self:'אי אפשר להסיר את עצמך',invalid_code_format:'הקוד חייב להכיל 8-40 אותיות באנגלית, ספרות ומקפים בלבד'};
-let me=null,tab='games',D={},PS=null;
+let me=null,tab=new URLSearchParams(location.search).get('tab')==='live'?'live':'games',D={},PS=null;
 const toast=(t,k)=>{const m=document.getElementById('msg');m.textContent=t;m.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>m.style.display='none',3500);k=k||(String(t).includes('✓')?'ok':null);if(k)sfx(k)};
 // ---- sounds (generated in the browser, no audio files) ----
 let AC=null;
@@ -138,7 +147,7 @@ function musicSet(on){
 }
 const musicFirstTap=e=>{if(e.target.closest('#sheet'))return;document.removeEventListener('click',musicFirstTap);if(musicPref()&&C.MUSIC_URL&&!music)musicSet(true)};
 document.addEventListener('click',musicFirstTap);
-if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data?.type==='push')sfx('chime')});
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',async e=>{if(e.data?.type==='push')sfx('chime');if(e.data?.type==='open'&&/tab=live/.test(e.data.url||'')&&me?.is_approved){tab='live';await load();render()}});
 const errText=e=>{const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));return k?ERR[k]:'משהו השתבש, נסה שוב'+(e.message?' ('+String(e.message).slice(0,50)+')':'')};
 
 function toggleTheme(){const h=document.documentElement,t=h.dataset.theme==='home'?'away':'home';h.dataset.theme=t;try{localStorage.setItem('theme',t)}catch{}}
@@ -234,6 +243,45 @@ function card(m){
   }
   return h+'</div>';
 }
+// ---- current match + live (provisional) standings ----
+const LIVE=['IN_PLAY','PAUSED'];
+const isLive=m=>!m.voided&&(LIVE.includes(m.status)||(['SCHEDULED','TIMED'].includes(m.status)&&Date.now()>=Date.parse(m.utc_date)&&Date.now()<Date.parse(m.utc_date)+3*36e5));
+const liveMatch=()=>D.matches.find(isLive);
+const curMatch=()=>liveMatch()||[...D.matches].reverse().find(m=>!m.voided&&Date.now()>=Date.parse(m.utc_date));
+const scoreOf=m=>m.status==='FINISHED'&&m.reg_home!=null?[m.reg_home,m.reg_away]:(m.live_home!=null?[m.live_home,m.live_away]:(isLive(m)?[0,0]:null));
+const grade=(g,[h,a])=>!g?'none':g.home_goals===h&&g.away_goals===a?'exact':Math.sign(g.home_goals-g.away_goals)===Math.sign(h-a)?'direction':'miss';
+const GR={exact:'מדויק',direction:'כיוון',miss:'פספוס',none:'לא ניחש'};
+const legend='<div class="lg"><span><i style="background:#18884a"></i>מדויק</span><span><i style="background:#d9a400"></i>כיוון</span><span><i style="background:#c0392b88"></i>פספוס</span><span><i style="border:1px dashed var(--mut)"></i>לא ניחש</span></div>';
+function liveHtml(){
+  const m=curMatch();
+  if(!m){const nx=D.matches.find(x=>!x.voided&&Date.parse(x.utc_date)>Date.now());return `<div class="card center">אין משחק נוכחי${nx?`<br><small>המשחק הבא: ${esc(team(nx.home_team))} - ${esc(team(nx.away_team))}, ${fmt(nx.utc_date)}</small>`:''}</div>`}
+  const live=isLive(m),sc=scoreOf(m)||[0,0],[ex,dr]=PTS(m);
+  const mem=D.standings.filter(r=>r.season_id===m.season_id),gs=D.guesses.filter(x=>x.match_id===m.id);
+  const ord={exact:0,direction:1,miss:2,none:3};
+  const list=mem.map(u=>{const g=gs.find(x=>x.user_id===u.user_id),k=grade(g,sc);return{u,g,k,p:k==='exact'?ex:k==='direction'?dr:0}})
+    .sort((a,b)=>ord[a.k]-ord[b.k]||String(a.u.display_name).localeCompare(String(b.u.display_name),'he'));
+  const cnt=k=>list.filter(x=>x.k===k).length;
+  return `<div class="card"><div class="meta"><span>${m.competition==='CL'?'ליגת האלופות':'לה ליגה'}${m.competition==='CL'&&KO[m.stage]?' · '+STAGE[m.stage]:''}</span><span>${live?'<b style="color:#e53935">LIVE</b><span class="dot"></span>':(ST[m.status]||m.status)}</span></div>
+  <div class="row"><b>${esc(team(m.home_team))}</b><span class="big">${sc[0]}:${sc[1]}</span><b>${esc(team(m.away_team))}</b></div>
+  <div class="hint">${live?'תוצאה זמנית · מתעדכן אוטומטית':'המשחק האחרון · '+fmt(m.utc_date)} · מדויק ${ex} · כיוון ${dr}</div>
+  <div class="sum" style="justify-content:center">מדויק <b>${cnt('exact')}</b> · כיוון <b>${cnt('direction')}</b> · פספוס <b>${cnt('miss')}</b> · לא ניחשו <b>${cnt('none')}</b></div>${legend}
+  ${list.map(({u,g,k,p})=>`<div class="gr ${k}${u.user_id===me.id?' me':''}" data-p="${u.user_id}"><span>${esc(u.display_name)}${u.user_id===me.id?' (אתה)':''}<br><small>${GR[k]}${p?` · ${live?'זמני ':''}+${p}`:''}</small></span><span class="gs">${g?`${g.home_goals}:${g.away_goals}`:'—'}</span></div>`).join('')}</div>`;
+}
+let prevRank={};
+function tableHtml(){
+  const sid=D.matches[0]?.season_id,rows=D.standings.filter(r=>r.season_id===sid);
+  const st=uid=>{const L=D.ledger.filter(x=>x.user_id===uid&&x.season_id===sid&&x.kind==='guess');return{n:L.length,ex:L.filter(x=>x.note==='exact').length,dr:L.filter(x=>x.note==='direction').length}};
+  const lm=liveMatch(),sc=lm&&scoreOf(lm),[ex,dr]=lm?PTS(lm):[0,0];
+  let R=rows.map((r,i)=>{const g=lm&&D.guesses.find(x=>x.match_id===lm.id&&x.user_id===r.user_id),k=lm?grade(g,sc):'none',add=k==='exact'?ex:k==='direction'?dr:0;
+    return{r,base:i,add,pts:r.points+add,exh:r.exact_hits+(k==='exact'?1:0),t:st(r.user_id)}});
+  if(lm)R=R.slice().sort((a,b)=>b.pts-a.pts||b.exh-a.exh||a.base-b.base);
+  const rk={};R.forEach((x,i)=>rk[x.r.user_id]=i);
+  const changed=new Set(R.filter(x=>prevRank[x.r.user_id]!=null&&prevRank[x.r.user_id]!==rk[x.r.user_id]).map(x=>x.r.user_id));prevRank=rk;
+  return `<div class="card">${lm?`<div class="boost" style="margin-top:0"><span class="dot"></span> <b>טבלה זמנית</b> לפי ${esc(team(lm.home_team))} ${sc[0]}:${sc[1]} ${esc(team(lm.away_team))}. החצים מראים שינוי מקום מלפני המשחק.</div>`:''}
+  <table><tr><th>#</th><th>שחקן</th><th>נק׳</th><th>ניחושים</th><th>מדויקים</th><th>כיוון</th><th>💪</th></tr>${R.map((x,i)=>{const mv=x.base-i;
+    return `<tr data-p="${x.r.user_id}"${changed.has(x.r.user_id)?' class="chg"':''}><td>${i+1}${lm&&mv?`<span class="mv ${mv>0?'up':'dn'}">${mv>0?'▲':'▼'}${Math.abs(mv)}</span>`:''}</td><td class="n">${esc(x.r.display_name)}${x.r.user_id===me.id?' (אתה)':''}</td><td class="n">${x.pts}${x.add?`<span class="prov">+${x.add}</span>`:''}</td><td>${x.t.n}</td><td>${x.t.ex}</td><td>${x.t.dr}</td><td>${owed(x.r.user_id)}</td></tr>`}).join('')}</table>
+  <div class="hint">לחצו על שחקן כדי לראות את הניחושים שלו. "ניחושים" = משחקים שהסתיימו וניחשו בהם. 💪 = שכיבות שמיכה שנשאר לבצע.${lm?' הנקודות בירוק זמניות עד סיום המשחק.':''}</div></div>`;
+}
 function render(){
   const up=D.matches.filter(m=>m.status!=='FINISHED'&&!m.voided).slice(0,12);
   const past=D.matches.filter(m=>m.status==='FINISHED'||m.voided).reverse();
@@ -241,13 +289,22 @@ function render(){
   if(tab==='games'){
     const pend=myOpenAwards();   // awards sit on finished matches (collapsed below), so surface them at the top
     body=pend.map(a=>{const m=D.matches.find(x=>x.id===a.match_id);return `<div class="card boost"><b>💪 יש לך ${a.total} שכיבות שמיכה לחלק</b><div>על התוצאה המדויקת${m?` ב${esc(team(m.home_team))} - ${esc(team(m.away_team))}`:''}. אפשר עד תחילת המשחק הבא.</div><button class="pri" type="button" data-pu="${a.id}" style="margin-top:8px">חלוקה</button></div>`}).join('')+(up.map(card).join('')||'<div class="center">אין משחקים קרובים</div>')+(past.length?`<details><summary>משחקים שהסתיימו (${past.length})</summary>${past.map(card).join('')}</details>`:'');
+  }else if(tab==='live'){
+    body=liveHtml();
   }else{
-    const sid=D.matches[0]?.season_id,rows=D.standings.filter(r=>r.season_id===sid);
-    const st=uid=>{const L=D.ledger.filter(x=>x.user_id===uid&&x.season_id===sid&&x.kind==='guess');return{n:L.length,ex:L.filter(x=>x.note==='exact').length,dr:L.filter(x=>x.note==='direction').length}};
-    body=`<div class="card"><table><tr><th>#</th><th>שחקן</th><th>נק׳</th><th>ניחושים</th><th>מדויקים</th><th>כיוון</th><th>💪</th></tr>${rows.map((r,i)=>{const t=st(r.user_id);return `<tr data-p="${r.user_id}"><td>${i+1}</td><td class="n">${esc(r.display_name)}${r.user_id===me.id?' (אתה)':''}</td><td class="n">${r.points}</td><td>${t.n}</td><td>${t.ex}</td><td>${t.dr}</td><td>${owed(r.user_id)}</td></tr>`}).join('')}</table><div class="hint">לחצו על שחקן כדי לראות את הניחושים שלו. "ניחושים" = משחקים שהסתיימו וניחשו בהם. 💪 = שכיבות שמיכה שנשאר לבצע.</div></div>`;
+    body=tableHtml();
   }
-  app.innerHTML=`<nav><button data-t="games" class="${tab==='games'?'on':''}">משחקים</button><button data-t="table" class="${tab==='table'?'on':''}">טבלה</button></nav>${body}`;
+  app.innerHTML=`<nav><button data-t="games" class="${tab==='games'?'on':''}">משחקים</button><button data-t="live" class="${tab==='live'?'on':''}">משחק נוכחי${liveMatch()?'<span class="dot"></span>':''}</button><button data-t="table" class="${tab==='table'?'on':''}">טבלה</button></nav>${body}`;
 }
+// while a match is live: refresh every 45s (guesses are revealed at kickoff, scores change)
+setInterval(async()=>{
+  if(!me?.is_approved||document.hidden||!D.matches||!liveMatch())return;
+  if(document.activeElement?.matches?.('input'))return;   // don't wipe a guess being typed
+  await load();if(document.getElementById('sheet').hidden)render();
+},45e3);
+document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me?.is_approved&&D.matches&&liveMatch()){await load();render()}});
+// desktop: the mouse wheel must not change a number field
+document.addEventListener('wheel',e=>{if(e.target.matches?.('input[type=number]')&&document.activeElement===e.target)e.target.blur()},{passive:true});
 app.addEventListener('click',e=>{
   const t=e.target.closest('[data-t]');if(t){tab=t.dataset.t;render()}
   const pr=e.target.closest('[data-p]');if(pr)sheet('p:'+pr.dataset.p);
@@ -332,6 +389,14 @@ function sheet(v){
   if(v)document.getElementById('panel').innerHTML=menuHtml(v);
   if(v==='admin')adminLoad();
 }
+const REM=[['','כבויה'],[15,'15 דקות לפני'],[30,'30 דקות לפני'],[60,'שעה לפני'],[120,'שעתיים לפני'],[180,'3 שעות לפני'],[360,'6 שעות לפני'],[720,'12 שעות לפני'],[1440,'יום לפני']];
+document.addEventListener('change',async e=>{
+  if(e.target.id!=='rem')return;
+  const v=e.target.value===''?null:Number(e.target.value);
+  const {error}=await sb.rpc('set_reminder',{p_minutes:v});
+  if(error){e.target.value=String(me.reminder_minutes??'');return fail(error)}
+  me.reminder_minutes=v;toast(v?'התזכורת עודכנה ✓':'התזכורת כובתה ✓');
+});
 const NOTE={exact:'מדויק',direction:'כיוון',miss:'פספוס'};
 function playerHtml(id){
   const u=D.standings.find(r=>r.user_id===id);
@@ -369,6 +434,7 @@ function menuHtml(v){
   const inst=dip?'<button class="pri" data-s="inst">התקנה</button>':`<small>${ios?'שיתוף ← הוסף למסך הבית':'תפריט הדפדפן ← התקנה'}</small>`;
   return `<div class="mi"><b>הגדרות</b><button class="lnk" data-s="close">סגירה</button></div>
   <div class="mi"><span>🔔 התראות</span>${notif}</div>
+  ${PS==='on'?`<div class="mi"><span>⏰ תזכורת לנחש<small>אם עוד לא ניחשת · בנוסף תמיד מגיעה התראה כשמשחק מתחיל</small></span><select id="rem" style="font:inherit;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)">${REM.map(([v,t])=>`<option value="${v}"${String(me.reminder_minutes??'')===String(v)?' selected':''}>${t}</option>`).join('')}</select></div>`:''}
   ${standalone?'':`<div class="mi"><span>📲 התקנת אפליקציה</span>${inst}</div>`}
   <div class="mi"><span>🎨 ערכת נושא: ${th}</span><button class="pri" data-s="theme">החלפה</button></div>
   <div class="mi"><span>✏️ שם תצוגה: <b>${esc(me.display_name)}</b></span><button class="pri" data-s="name">עריכה</button></div>

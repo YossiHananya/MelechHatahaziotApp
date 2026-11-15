@@ -1,6 +1,6 @@
 // Service worker: network-first for the app's own files (so updates arrive fast),
 // cached copy as an offline fallback. API calls and CDN scripts are never touched.
-const CACHE = "melech-v8";
+const CACHE = "melech-v9";
 const SHELL = [
   "./",
   "index.html",
@@ -81,8 +81,13 @@ self.addEventListener("notificationclick", (e) => {
     clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((list) => {
-        for (const c of list) if ("focus" in c) return c.focus();
-        return clients.openWindow(e.notification.data.url);
+        const url = e.notification.data.url;
+        for (const c of list)
+          if ("focus" in c) {
+            c.postMessage({ type: "open", url });
+            return c.focus();
+          }
+        return clients.openWindow(url);
       }),
   );
 });
