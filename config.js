@@ -9,8 +9,7 @@ window.APP_CONFIG = {
     "38599321289-nejcjg52rae4e53lbiuu6ifhst6ovqfk.apps.googleusercontent.com", // Google OAuth Web client ID (public) - fixes sign-in inside the iPhone home-screen app
   MUSIC_URL: "theme_song.mp3", // optional: file name of a background song in the repo, e.g. 'music.mp3' (leave empty for no music button)
   VOICE_FILES: {
-    score_taken: "voice/score_taken.mp3",
-    // edit_limit_reached: 'voice/edit_limit_reached.mp3',
+    // score_taken: "voice/score_taken.mp3", // no longer used: the same score may now be picked by several players
     // guess_window_closed: 'voice/guess_window_closed.mp3',
   },
 };
