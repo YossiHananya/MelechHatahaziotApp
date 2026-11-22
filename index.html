@@ -229,7 +229,7 @@ function card(m){
   if(aw)h+=`<div class="boost"><b>💪 פגעת בתוצאה המדויקת!</b><div>יש לך ${aw.total} שכיבות שמיכה לחלק, עד תחילת המשחק הבא.</div><button class="pri" type="button" data-pu="${aw.id}" style="margin-top:8px">חלוקה</button></div>`;
   if(open){
     h+=`<form class="g" data-m="${m.id}"><input type="number" name="h" min="0" max="20" inputmode="numeric" required value="${mine?.home_goals??''}"><span>:</span><input type="number" name="a" min="0" max="20" inputmode="numeric" required value="${mine?.away_goals??''}"><button>${mine?'עדכון':'שמירה'}</button></form>
-    <div class="hint">אפשר לערוך עד שריקת הפתיחה</div>`;
+    <div class="hint">אפשר לערוך עד שריקת הפתיחה${mine?` · <button class="lnk" type="button" data-del="${m.id}">מחיקת הניחוש</button>`:''}</div>`;
   }else if(mine){
     h+=`<div style="text-align:center">הניחוש שלך: <b>${mine.home_goals}:${mine.away_goals}</b>${pt?` · <span class="pts ${pt.amount>=0?'pos':'neg'}">${pt.amount>0?'+':''}${pt.amount}</span>`:''}</div>`;
   }else if(m.status==='FINISHED'||now>=ko){h+='<div class="hint">לא ניחשת במשחק הזה</div>'}
@@ -315,6 +315,14 @@ app.addEventListener('submit',async e=>{
   const {error}=await sb.rpc('submit_guess',{p_match_id:Number(f.dataset.m),p_home:Number(f.h.value),p_away:Number(f.a.value)});
   if(error)return fail(error);
   toast('הניחוש נשמר ✓');await load();render();
+});
+app.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-del]');if(!b)return;
+  if(b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent='ללחוץ שוב למחיקה';setTimeout(()=>{if(b.isConnected){b.dataset.sure='';b.textContent='מחיקת הניחוש'}},4000);return}
+  b.disabled=true;
+  const {error}=await sb.rpc('delete_guess',{p_match_id:Number(b.dataset.del)});
+  if(error){b.disabled=false;return fail(error)}
+  toast('הניחוש נמחק');await load();render();
 });
 // ---- push-up distribution ----
 document.addEventListener('click',e=>{const b=e.target.closest('[data-pu]');if(b)sheet('pu:'+b.dataset.pu)});
