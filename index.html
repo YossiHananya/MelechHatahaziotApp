@@ -69,7 +69,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}input[type=num
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e53935;margin-inline-start:6px;vertical-align:middle;animation:blink 1.2s infinite}@keyframes blink{50%{opacity:.25}}
 .gr{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;margin:6px 0;border:1px solid var(--line);transition:background .4s,border-color .4s}
 .gr.exact{background:#18884a26;border-color:#18884a}.gr.direction{background:#d9a40024;border-color:#d9a400}.gr.miss{background:#c0392b14;border-color:#c0392b66}.gr.none{opacity:.6;border-style:dashed}
-.gr .gs{font-weight:700;font-size:1.1rem}.gr small{color:var(--mut)}.gr.me{box-shadow:inset 3px 0 0 var(--p2)}
+.gr .gs{font-weight:700;font-size:1.1rem}
+.s2{display:inline-flex;direction:rtl;unicode-bidi:isolate;gap:.05em}.gr small{color:var(--mut)}.gr.me{box-shadow:inset 3px 0 0 var(--p2)}
 .lg{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;font-size:.8rem;color:var(--mut);margin:6px 0}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:4px;vertical-align:middle}
 .mv{font-size:.75rem;font-weight:700;margin-inline-start:4px}.up{color:#18884a}.dn{color:#c0392b}.prov{color:#18884a;font-size:.8rem;font-weight:700;margin-inline-start:4px}
 tr.chg td{animation:flash 1.2s ease}@keyframes flash{from{background:#e4c46655}}
@@ -88,6 +89,8 @@ tr.chg td{animation:flash 1.2s ease}@keyframes flash{from{background:#e4c46655}}
 const C=window.APP_CONFIG||{};
 const sb=supabase.createClient(C.SUPABASE_URL,C.SUPABASE_KEY);
 const app=document.getElementById('app');
+// score shown home-on-the-right, matching the RTL team row (home team is on the right)
+const SC=(h,a)=>`<span class="s2"><span>${h}</span><span>:</span><span>${a}</span></span>`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=d=>new Intl.DateTimeFormat('he-IL',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jerusalem'}).format(new Date(d));
 const team=n=>window.teamHe?window.teamHe(n):n;
@@ -218,7 +221,7 @@ function card(m){
   const now=Date.now(),ko=Date.parse(m.utc_date);
   const mine=D.guesses.find(x=>x.match_id===m.id&&x.user_id===me.id);
   const open=!m.voided&&['SCHEDULED','TIMED'].includes(m.status)&&now<ko;
-  const sc=m.live_home!=null&&now>=ko?`${m.live_home}:${m.live_away}`:'vs';
+  const sc=m.live_home!=null&&now>=ko?SC(m.live_home,m.live_away):'vs';
   const pt=D.ledger.find(x=>x.user_id===me.id&&x.match_id===m.id&&x.kind==='guess');
   const reveal=now>=ko;
   const [ex,dr]=PTS(m),big=ex>5;
@@ -231,13 +234,13 @@ function card(m){
     h+=`<form class="g" data-m="${m.id}"><input type="number" name="h" min="0" max="20" inputmode="numeric" required value="${mine?.home_goals??''}"><span>:</span><input type="number" name="a" min="0" max="20" inputmode="numeric" required value="${mine?.away_goals??''}"><button>${mine?'עדכון':'שמירה'}</button></form>
     <div class="hint">אפשר לערוך עד שריקת הפתיחה${mine?` · <button class="lnk" type="button" data-del="${m.id}">מחיקת הניחוש</button>`:''}</div>`;
   }else if(mine){
-    h+=`<div style="text-align:center">הניחוש שלך: <b>${mine.home_goals}:${mine.away_goals}</b>${pt?` · <span class="pts ${pt.amount>=0?'pos':'neg'}">${pt.amount>0?'+':''}${pt.amount}</span>`:''}</div>`;
+    h+=`<div style="text-align:center">הניחוש שלך: <b>${SC(mine.home_goals,mine.away_goals)}</b>${pt?` · <span class="pts ${pt.amount>=0?'pos':'neg'}">${pt.amount>0?'+':''}${pt.amount}</span>`:''}</div>`;
   }else if(m.status==='FINISHED'||now>=ko){h+='<div class="hint">לא ניחשת במשחק הזה</div>'}
   if(reveal){
     const mem=D.standings.filter(r=>r.season_id===m.season_id),gs=D.guesses.filter(x=>x.match_id===m.id);
     const list=mem.map(u=>({u,g:gs.find(x=>x.user_id===u.user_id),pt:D.ledger.find(x=>x.user_id===u.user_id&&x.match_id===m.id&&x.kind==='guess')}));
     list.sort((a,b)=>(b.g?1:0)-(a.g?1:0)||String(a.u.display_name).localeCompare(String(b.u.display_name),'he'));
-    h+=`<details class="all"${m.status==='FINISHED'?'':' open'}><summary>ניחושי כולם (${gs.length} מתוך ${mem.length})</summary><div class="gl">${list.map(({u,g,pt})=>`<div class="${u.user_id===me.id?'me':''}${g?'':' no'}"><span>${esc(u.display_name)}</span><span>${g?`<b>${g.home_goals}:${g.away_goals}</b>`:'—'}${pt?` <small class="${pt.amount>=0?'pos':'neg'}">${pt.amount>0?'+':''}${pt.amount}</small>`:''}</span></div>`).join('')}</div></details>`;
+    h+=`<details class="all"${m.status==='FINISHED'?'':' open'}><summary>ניחושי כולם (${gs.length} מתוך ${mem.length})</summary><div class="gl">${list.map(({u,g,pt})=>`<div class="${u.user_id===me.id?'me':''}${g?'':' no'}"><span>${esc(u.display_name)}</span><span>${g?`<b>${SC(g.home_goals,g.away_goals)}</b>`:'—'}${pt?` <small class="${pt.amount>=0?'pos':'neg'}">${pt.amount>0?'+':''}${pt.amount}</small>`:''}</span></div>`).join('')}</div></details>`;
   }else if(!m.voided&&['SCHEDULED','TIMED'].includes(m.status)){
     h+=`<div class="hint">ניחושי כולם ייחשפו בשריקת הפתיחה</div>`;
   }
@@ -262,10 +265,10 @@ function liveHtml(){
     .sort((a,b)=>ord[a.k]-ord[b.k]||String(a.u.display_name).localeCompare(String(b.u.display_name),'he'));
   const cnt=k=>list.filter(x=>x.k===k).length;
   return `<div class="card"><div class="meta"><span>${m.competition==='CL'?'ליגת האלופות':'לה ליגה'}${m.competition==='CL'&&KO[m.stage]?' · '+STAGE[m.stage]:''}</span><span>${live?'<b style="color:#e53935">LIVE</b><span class="dot"></span>':(ST[m.status]||m.status)}</span></div>
-  <div class="row"><b>${esc(team(m.home_team))}</b><span class="big">${sc[0]}:${sc[1]}</span><b>${esc(team(m.away_team))}</b></div>
+  <div class="row"><b>${esc(team(m.home_team))}</b><span class="big">${SC(sc[0],sc[1])}</span><b>${esc(team(m.away_team))}</b></div>
   <div class="hint">${live?'תוצאה זמנית · מתעדכן אוטומטית':'המשחק האחרון · '+fmt(m.utc_date)} · מדויק ${ex} · כיוון ${dr}</div>
   <div class="sum" style="justify-content:center">מדויק <b>${cnt('exact')}</b> · כיוון <b>${cnt('direction')}</b> · פספוס <b>${cnt('miss')}</b> · לא ניחשו <b>${cnt('none')}</b></div>${legend}
-  ${list.map(({u,g,k,p})=>`<div class="gr ${k}${u.user_id===me.id?' me':''}" data-p="${u.user_id}"><span>${esc(u.display_name)}${u.user_id===me.id?' (אתה)':''}<br><small>${GR[k]}${p?` · ${live?'זמני ':''}+${p}`:''}</small></span><span class="gs">${g?`${g.home_goals}:${g.away_goals}`:'—'}</span></div>`).join('')}</div>`;
+  ${list.map(({u,g,k,p})=>`<div class="gr ${k}${u.user_id===me.id?' me':''}" data-p="${u.user_id}"><span>${esc(u.display_name)}${u.user_id===me.id?' (אתה)':''}<br><small>${GR[k]}${p?` · ${live?'זמני ':''}+${p}`:''}</small></span><span class="gs">${g?SC(g.home_goals,g.away_goals):'—'}</span></div>`).join('')}</div>`;
 }
 let prevRank={};
 function tableHtml(){
@@ -277,7 +280,7 @@ function tableHtml(){
   if(lm)R=R.slice().sort((a,b)=>b.pts-a.pts||b.exh-a.exh||a.base-b.base);
   const rk={};R.forEach((x,i)=>rk[x.r.user_id]=i);
   const changed=new Set(R.filter(x=>prevRank[x.r.user_id]!=null&&prevRank[x.r.user_id]!==rk[x.r.user_id]).map(x=>x.r.user_id));prevRank=rk;
-  return `<div class="card">${lm?`<div class="boost" style="margin-top:0"><span class="dot"></span> <b>טבלה זמנית</b> לפי ${esc(team(lm.home_team))} ${sc[0]}:${sc[1]} ${esc(team(lm.away_team))}. החצים מראים שינוי מקום מלפני המשחק.</div>`:''}
+  return `<div class="card">${lm?`<div class="boost" style="margin-top:0"><span class="dot"></span> <b>טבלה זמנית</b> לפי ${esc(team(lm.home_team))} ${SC(sc[0],sc[1])} ${esc(team(lm.away_team))}. החצים מראים שינוי מקום מלפני המשחק.</div>`:''}
   <table><tr><th>#</th><th>שחקן</th><th>נק׳</th><th>ניחושים</th><th>מדויקים</th><th>כיוון</th><th>💪</th></tr>${R.map((x,i)=>{const mv=x.base-i;
     return `<tr data-p="${x.r.user_id}"${changed.has(x.r.user_id)?' class="chg"':''}><td>${i+1}${lm&&mv?`<span class="mv ${mv>0?'up':'dn'}">${mv>0?'▲':'▼'}${Math.abs(mv)}</span>`:''}</td><td class="n">${esc(x.r.display_name)}${x.r.user_id===me.id?' (אתה)':''}</td><td class="n">${x.pts}${x.add?`<span class="prov">+${x.add}</span>`:''}</td><td>${x.t.n}</td><td>${x.t.ex}</td><td>${x.t.dr}</td><td>${owed(x.r.user_id)}</td></tr>`}).join('')}</table>
   <div class="hint">לחצו על שחקן כדי לראות את הניחושים שלו. "ניחושים" = משחקים שהסתיימו וניחשו בהם. 💪 = שכיבות שמיכה שנשאר לבצע.${lm?' הנקודות בירוק זמניות עד סיום המשחק.':''}</div></div>`;
@@ -418,8 +421,8 @@ function playerHtml(id){
     const g=D.guesses.find(x=>x.match_id===m.id&&x.user_id===id);
     const rows=D.ledger.filter(x=>x.user_id===id&&x.match_id===m.id);
     const net=rows.reduce((a,x)=>a+x.amount,0),gr=rows.find(x=>x.kind==='guess');
-    const res=m.status==='FINISHED'&&m.reg_home!=null?`${m.reg_home}:${m.reg_away}`:(m.live_home!=null?`${m.live_home}:${m.live_away}`:'—');
-    return `<div class="mi"><div>${esc(team(m.home_team))} - ${esc(team(m.away_team))}<small>${fmt(m.utc_date)} · תוצאה: ${res}${gr?' · '+(NOTE[gr.note]||''):''}</small></div><div style="text-align:end"><b>${g.home_goals}:${g.away_goals}</b>${rows.length?`<small class="pts ${net>=0?'pos':'neg'}">${net>0?'+':''}${net}</small>`:'<small>ממתין</small>'}</div></div>`}).join('')||'<div class="hint">עדיין אין ניחושים להצגה</div>'}</div>`;
+    const res=m.status==='FINISHED'&&m.reg_home!=null?SC(m.reg_home,m.reg_away):(m.live_home!=null?SC(m.live_home,m.live_away):'—');
+    return `<div class="mi"><div>${esc(team(m.home_team))} - ${esc(team(m.away_team))}<small>${fmt(m.utc_date)} · תוצאה: ${res}${gr?' · '+(NOTE[gr.note]||''):''}</small></div><div style="text-align:end"><b>${SC(g.home_goals,g.away_goals)}</b>${rows.length?`<small class="pts ${net>=0?'pos':'neg'}">${net>0?'+':''}${net}</small>`:'<small>ממתין</small>'}</div></div>`}).join('')||'<div class="hint">עדיין אין ניחושים להצגה</div>'}</div>`;
 }
 function menuHtml(v){
   if(v.startsWith('p:'))return playerHtml(v.slice(2));
