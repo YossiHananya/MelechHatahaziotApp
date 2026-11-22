@@ -216,7 +216,7 @@ const RULES=`<div class="card rules"><h3>הניחוש</h3><ul><li>מנחשים �
 <h3>ניקוד</h3><ul><li>תוצאה מדויקת: 5 נקודות.</li><li>כיוון נכון (ניצחון, הפסד או תיקו): 3 נקודות.</li><li>בכל מקרה אחר: 0.</li></ul>
 <h3>ליגת האלופות – שלבי ההכרעה</h3><ul><li>רבע גמר: מדויק 8, כיוון 4.</li><li>חצי גמר: מדויק 12, כיוון 6.</li><li>גמר: מדויק 20, כיוון 10.</li></ul>
 <h3>💪 שכיבות שמיכה</h3><ul><li>כולם מתחילים עם 0 שכיבות שמיכה.</li><li>מי שניחש תוצאה מדויקת מקבל שכיבות שמיכה לחלק: 5 במשחק רגיל, ובשלבי ההכרעה של ליגת האלופות כמו נקודות המדויק (8, 12 או 20).</li><li>אפשר לחלק לכל שחקן, גם לעצמך, לחלק רק חלק או לא לחלק בכלל.</li><li>החלוקה אפשרית עד תחילת המשחק הבא. אחרי זה השכיבות שלא חולקו אובדות.</li><li>החלוקה סופית ואי אפשר לשנות אותה.</li><li>רק המנהל מסמן שכיבות שמיכה כ"בוצעו".</li></ul>
-<h3>משחק שנדחה או בוטל</h3><p>המשחק מבוטל ולא נספרות בו נקודות.</p></div>`;
+<h3>שוויון בנקודות</h3><ol><li>מספר הניחושים המדויקים – מי שפגע יותר בתוצאה המדויקת מדורג גבוה יותר.</li><li>מספר ניחושי הכיוון הנכון.</li><li>כמות שכיבות השמיכה שנשאר לבצע – מי שחייב פחות מדורג גבוה יותר.</li><li>אם השחקנים שווים גם בזה, הם חולקים את המקום.</li></ol><h3>משחק שנדחה או בוטל</h3><p>המשחק מבוטל ולא נספרות בו נקודות.</p></div>`;
 function card(m){
   const now=Date.now(),ko=Date.parse(m.utc_date);
   const mine=D.guesses.find(x=>x.match_id===m.id&&x.user_id===me.id);
@@ -271,19 +271,31 @@ function liveHtml(){
   ${list.map(({u,g,k,p})=>`<div class="gr ${k}${u.user_id===me.id?' me':''}" data-p="${u.user_id}"><span>${esc(u.display_name)}${u.user_id===me.id?' (אתה)':''}<br><small>${GR[k]}${p?` · ${live?'זמני ':''}+${p}`:''}</small></span><span class="gs">${g?SC(g.home_goals,g.away_goals):'—'}</span></div>`).join('')}</div>`;
 }
 let prevRank={};
+// standings order: points, then exact hits, then right-direction hits, then fewer push-ups owed; equal on all four = shared place
+const tieCmp=(a,b)=>b.pts-a.pts||b.ex-a.ex||b.dr-a.dr||a.ow-b.ow;
+const byName=(a,b)=>String(a.r.display_name).localeCompare(String(b.r.display_name),'he');
+// sort + competition ranking ("1,2,2,4"): a row equal to the one above it gets the same place
+function rankRows(R,key){
+  const S=R.map(x=>({...x,...key(x)})).sort((a,b)=>tieCmp(a,b)||byName(a,b));
+  S.forEach((x,i)=>x.place=i&&!tieCmp(S[i-1],x)?S[i-1].place:i+1);
+  return S;
+}
 function tableHtml(){
   const sid=D.matches[0]?.season_id,rows=D.standings.filter(r=>r.season_id===sid);
   const st=uid=>{const L=D.ledger.filter(x=>x.user_id===uid&&x.season_id===sid&&x.kind==='guess');return{n:L.length,ex:L.filter(x=>x.note==='exact').length,dr:L.filter(x=>x.note==='direction').length}};
   const lm=liveMatch(),sc=lm&&scoreOf(lm),[ex,dr]=lm?PTS(lm):[0,0];
-  let R=rows.map((r,i)=>{const g=lm&&D.guesses.find(x=>x.match_id===lm.id&&x.user_id===r.user_id),k=lm?grade(g,sc):'none',add=k==='exact'?ex:k==='direction'?dr:0;
-    return{r,base:i,add,pts:r.points+add,exh:r.exact_hits+(k==='exact'?1:0),t:st(r.user_id)}});
-  if(lm)R=R.slice().sort((a,b)=>b.pts-a.pts||b.exh-a.exh||a.base-b.base);
-  const rk={};R.forEach((x,i)=>rk[x.r.user_id]=i);
+  const R0=rows.map(r=>{const g=lm&&D.guesses.find(x=>x.match_id===lm.id&&x.user_id===r.user_id),k=lm?grade(g,sc):'none';
+    return{r,k,add:k==='exact'?ex:k==='direction'?dr:0,t:st(r.user_id),ow:owed(r.user_id)}});
+  // place before the live match (final results only) — used for the movement arrows
+  const basePlace={};rankRows(R0,x=>({pts:x.r.points,ex:x.t.ex,dr:x.t.dr})).forEach(x=>basePlace[x.r.user_id]=x.place);
+  // current (provisional while live) table: the live match's exact/direction also count for the tie-break
+  const R=rankRows(R0,x=>({pts:x.r.points+x.add,ex:x.t.ex+(x.k==='exact'?1:0),dr:x.t.dr+(x.k==='direction'?1:0)}));
+  const rk={};R.forEach(x=>rk[x.r.user_id]=x.place);
   const changed=new Set(R.filter(x=>prevRank[x.r.user_id]!=null&&prevRank[x.r.user_id]!==rk[x.r.user_id]).map(x=>x.r.user_id));prevRank=rk;
   return `<div class="card">${lm?`<div class="boost" style="margin-top:0"><span class="dot"></span> <b>טבלה זמנית</b> לפי ${esc(team(lm.home_team))} ${SC(sc[0],sc[1])} ${esc(team(lm.away_team))}. החצים מראים שינוי מקום מלפני המשחק.</div>`:''}
-  <table><tr><th>#</th><th>שחקן</th><th>נק׳</th><th>ניחושים</th><th>מדויקים</th><th>כיוון</th><th>💪</th></tr>${R.map((x,i)=>{const mv=x.base-i;
-    return `<tr data-p="${x.r.user_id}"${changed.has(x.r.user_id)?' class="chg"':''}><td>${i+1}${lm&&mv?`<span class="mv ${mv>0?'up':'dn'}">${mv>0?'▲':'▼'}${Math.abs(mv)}</span>`:''}</td><td class="n">${esc(x.r.display_name)}${x.r.user_id===me.id?' (אתה)':''}</td><td class="n">${x.pts}${x.add?`<span class="prov">+${x.add}</span>`:''}</td><td>${x.t.n}</td><td>${x.t.ex}</td><td>${x.t.dr}</td><td>${owed(x.r.user_id)}</td></tr>`}).join('')}</table>
-  <div class="hint">לחצו על שחקן כדי לראות את הניחושים שלו. "ניחושים" = משחקים שהסתיימו וניחשו בהם. 💪 = שכיבות שמיכה שנשאר לבצע.${lm?' הנקודות בירוק זמניות עד סיום המשחק.':''}</div></div>`;
+  <table><tr><th>#</th><th>שחקן</th><th>נק׳</th><th>ניחושים</th><th>מדויקים</th><th>כיוון</th><th>💪</th></tr>${R.map((x,i)=>{const mv=basePlace[x.r.user_id]-x.place,shared=R.some(y=>y!==x&&y.place===x.place);
+    return `<tr data-p="${x.r.user_id}"${changed.has(x.r.user_id)?' class="chg"':''}><td>${x.place}${shared?'<small title="מקום משותף">=</small>':''}${lm&&mv?`<span class="mv ${mv>0?'up':'dn'}">${mv>0?'▲':'▼'}${Math.abs(mv)}</span>`:''}</td><td class="n">${esc(x.r.display_name)}${x.r.user_id===me.id?' (אתה)':''}</td><td class="n">${x.pts}${x.add?`<span class="prov">+${x.add}</span>`:''}</td><td>${x.t.n}</td><td>${x.ex}</td><td>${x.dr}</td><td>${x.ow}</td></tr>`}).join('')}</table>
+  <div class="hint">לחצו על שחקן כדי לראות את הניחושים שלו. "ניחושים" = משחקים שהסתיימו וניחשו בהם. 💪 = שכיבות שמיכה שנשאר לבצע. בשוויון נקודות: יותר מדויקים, אחר כך יותר כיוון, אחר כך פחות 💪; שוויון בכל אלה = מקום משותף (=).${lm?' הנקודות בירוק זמניות עד סיום המשחק.':''}</div></div>`;
 }
 function render(){
   const up=D.matches.filter(m=>m.status!=='FINISHED'&&!m.voided).slice(0,12);
