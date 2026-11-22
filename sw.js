@@ -1,6 +1,6 @@
 // Service worker: network-first for the app's own files (so updates arrive fast),
 // cached copy as an offline fallback. API calls and CDN scripts are never touched.
-const CACHE = "melech-v9";
+const CACHE = "melech-v10";
 const SHELL = [
   "./",
   "index.html",
