@@ -1,4 +1,4 @@
--- 005_pushups.sql — push-ups ("שכיבות שמיכה")
+-- 005_pushups.sql — push-ups ("שכיבות סמיכה")
 -- Rules:
 --   * everyone starts at 0 owed
 --   * an exact-score guess earns push-ups to hand out, equal to that match's exact-score points

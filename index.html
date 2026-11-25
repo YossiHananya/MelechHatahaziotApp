@@ -223,8 +223,8 @@ const uname=uid=>D.standings.find(r=>r.user_id===uid)?.display_name||'שחקן';
 const RULES=`<div class="card rules"><h3>הניחוש</h3><ul><li>מנחשים את תוצאת 90 הדקות (בלי הארכה ופנדלים) של משחקי ברצלונה בלה ליגה ובליגת האלופות.</li><li>אפשר לערוך את הניחוש כמה פעמים שרוצים, עד שריקת הפתיחה. אין חלון חסד.</li><li>מותר לבחור תוצאה שמישהו אחר כבר בחר.</li><li>הניחושים של כולם נחשפים בשריקת הפתיחה.</li><li>אפשר לראות את הניחושים של כל שחקן במשחקים קודמים (לחיצה על שם בטבלה).</li></ul>
 <h3>ניקוד</h3><ul><li>תוצאה מדויקת: 5 נקודות.</li><li>כיוון נכון (ניצחון, הפסד או תיקו): 3 נקודות.</li><li>בכל מקרה אחר: 0.</li></ul>
 <h3>ליגת האלופות – שלבי ההכרעה</h3><ul><li>רבע גמר: מדויק 8, כיוון 4.</li><li>חצי גמר: מדויק 12, כיוון 6.</li><li>גמר: מדויק 20, כיוון 10.</li></ul>
-<h3>💪 שכיבות שמיכה</h3><ul><li>כולם מתחילים עם 0 שכיבות שמיכה.</li><li>מי שניחש תוצאה מדויקת מקבל שכיבות שמיכה לחלק: 5 במשחק רגיל, ובשלבי ההכרעה של ליגת האלופות כמו נקודות המדויק (8, 12 או 20).</li><li>אפשר לחלק לכל שחקן, גם לעצמך, לחלק רק חלק או לא לחלק בכלל.</li><li>החלוקה אפשרית עד תחילת המשחק הבא. אחרי זה השכיבות שלא חולקו אובדות.</li><li>החלוקה סופית ואי אפשר לשנות אותה.</li><li>רק המנהל מסמן שכיבות שמיכה כ"בוצעו".</li></ul>
-<h3>שוויון בנקודות</h3><ol><li>מספר הניחושים המדויקים – מי שפגע יותר בתוצאה המדויקת מדורג גבוה יותר.</li><li>מספר ניחושי הכיוון הנכון.</li><li>כמות שכיבות השמיכה שנשאר לבצע – מי שחייב פחות מדורג גבוה יותר.</li><li>אם השחקנים שווים גם בזה, הם חולקים את המקום.</li></ol><h3>משחק שנדחה או בוטל</h3><p>המשחק מבוטל ולא נספרות בו נקודות.</p></div>`;
+<h3>💪 שכיבות סמיכה</h3><ul><li>כולם מתחילים עם 0 שכיבות סמיכה.</li><li>מי שניחש תוצאה מדויקת מקבל שכיבות סמיכה לחלק: 5 במשחק רגיל, ובשלבי ההכרעה של ליגת האלופות כמו נקודות המדויק (8, 12 או 20).</li><li>אפשר לחלק לכל שחקן, גם לעצמך, לחלק רק חלק או לא לחלק בכלל.</li><li>החלוקה אפשרית עד תחילת המשחק הבא. אחרי זה השכיבות שלא חולקו אובדות.</li><li>החלוקה סופית ואי אפשר לשנות אותה.</li><li>רק המנהל מסמן שכיבות סמיכה כ"בוצעו".</li></ul>
+<h3>שוויון בנקודות</h3><ol><li>מספר הניחושים המדויקים – מי שפגע יותר בתוצאה המדויקת מדורג גבוה יותר.</li><li>מספר ניחושי הכיוון הנכון.</li><li>כמות שכיבות הסמיכה שנשאר לבצע – מי שחייב פחות מדורג גבוה יותר.</li><li>אם השחקנים שווים גם בזה, הם חולקים את המקום.</li></ol><h3>משחק שנדחה או בוטל</h3><p>המשחק מבוטל ולא נספרות בו נקודות.</p></div>`;
 function card(m){
   const now=Date.now(),ko=Date.parse(m.utc_date);
   const mine=D.guesses.find(x=>x.match_id===m.id&&x.user_id===me.id);
@@ -237,7 +237,7 @@ function card(m){
   let h=`<div class="card"><div class="meta"><span>${m.competition==='CL'?'ליגת האלופות':'לה ליגה'}${m.competition==='CL'&&STAGE[m.stage]&&m.stage!=='LEAGUE_STAGE'?' · '+STAGE[m.stage]:''}${m.matchday&&m.competition!=='CL'?' · מחזור '+m.matchday:''}</span><span>${m.voided?'בוטל':ST[m.status]||m.status}</span></div>
   <div class="meta"><span>${fmt(m.utc_date)}</span>${!m.voided?`<span>${big?'<span class="tag">':''}מדויק ${ex} · כיוון ${dr}${big?'</span>':''}</span>`:''}</div>
   <div class="row"><b>${esc(team(m.home_team))}</b><span class="sc">${sc}</span><b>${esc(team(m.away_team))}</b></div>`;
-  if(aw)h+=`<div class="boost"><b>💪 פגעת בתוצאה המדויקת!</b><div>יש לך ${aw.total} שכיבות שמיכה לחלק, עד תחילת המשחק הבא.</div><button class="pri" type="button" data-pu="${aw.id}" style="margin-top:8px">חלוקה</button></div>`;
+  if(aw)h+=`<div class="boost"><b>💪 פגעת בתוצאה המדויקת!</b><div>יש לך ${aw.total} שכיבות סמיכה לחלק, עד תחילת המשחק הבא.</div><button class="pri" type="button" data-pu="${aw.id}" style="margin-top:8px">חלוקה</button></div>`;
   if(open){
     h+=`<form class="g" data-m="${m.id}"><input type="number" name="h" min="0" max="20" inputmode="numeric" required value="${mine?.home_goals??''}"><span>:</span><input type="number" name="a" min="0" max="20" inputmode="numeric" required value="${mine?.away_goals??''}"><button>${mine?'עדכון':'שמירה'}</button></form>
     <div class="hint">אפשר לערוך עד שריקת הפתיחה${mine?` · <button class="lnk" type="button" data-del="${m.id}">מחיקת הניחוש</button>`:''}</div>`;
@@ -303,7 +303,7 @@ function tableHtml(){
   return `<div class="card">${lm?`<div class="boost" style="margin-top:0"><span class="dot"></span> <b>טבלה זמנית</b> לפי ${esc(team(lm.home_team))} ${SC(sc[0],sc[1])} ${esc(team(lm.away_team))}. החצים מראים שינוי מקום מלפני המשחק.</div>`:''}
   <table><tr><th>#</th><th>שחקן</th><th>נק׳</th><th>ניחושים</th><th>מדויקים</th><th>כיוון</th><th>💪</th></tr>${R.map((x,i)=>{const mv=basePlace[x.r.user_id]-x.place,shared=R.some(y=>y!==x&&y.place===x.place);
     return `<tr data-p="${x.r.user_id}"${changed.has(x.r.user_id)?' class="chg"':''}><td>${x.place}${shared?'<small title="מקום משותף">=</small>':''}${lm&&mv?`<span class="mv ${mv>0?'up':'dn'}">${mv>0?'▲':'▼'}${Math.abs(mv)}</span>`:''}</td><td class="n">${esc(x.r.display_name)}${x.r.user_id===me.id?' (אתה)':''}</td><td class="n">${x.pts}${x.add?`<span class="prov">+${x.add}</span>`:''}</td><td>${x.t.n}</td><td>${x.ex}</td><td>${x.dr}</td><td>${x.ow}</td></tr>`}).join('')}</table>
-  <div class="hint">לחצו על שחקן כדי לראות את הניחושים שלו. "ניחושים" = משחקים שהסתיימו וניחשו בהם. 💪 = שכיבות שמיכה שנשאר לבצע. בשוויון נקודות: יותר מדויקים, אחר כך יותר כיוון, אחר כך פחות 💪; שוויון בכל אלה = מקום משותף (=).${lm?' הנקודות בירוק זמניות עד סיום המשחק.':''}</div></div>`;
+  <div class="hint">לחצו על שחקן כדי לראות את הניחושים שלו. "ניחושים" = משחקים שהסתיימו וניחשו בהם. 💪 = שכיבות סמיכה שנשאר לבצע. בשוויון נקודות: יותר מדויקים, אחר כך יותר כיוון, אחר כך פחות 💪; שוויון בכל אלה = מקום משותף (=).${lm?' הנקודות בירוק זמניות עד סיום המשחק.':''}</div></div>`;
 }
 function render(){
   const up=D.matches.filter(m=>m.status!=='FINISHED'&&!m.voided).slice(0,12);
@@ -311,7 +311,7 @@ function render(){
   let body='';
   if(tab==='games'){
     const pend=myOpenAwards();   // awards sit on finished matches (collapsed below), so surface them at the top
-    body=pend.map(a=>{const m=D.matches.find(x=>x.id===a.match_id);return `<div class="card boost"><b>💪 יש לך ${a.total} שכיבות שמיכה לחלק</b><div>על התוצאה המדויקת${m?` ב${esc(team(m.home_team))} - ${esc(team(m.away_team))}`:''}. אפשר עד תחילת המשחק הבא.</div><button class="pri" type="button" data-pu="${a.id}" style="margin-top:8px">חלוקה</button></div>`}).join('')+(up.map(card).join('')||'<div class="center">אין משחקים קרובים</div>')+(past.length?`<details><summary>משחקים שהסתיימו (${past.length})</summary>${past.map(card).join('')}</details>`:'');
+    body=pend.map(a=>{const m=D.matches.find(x=>x.id===a.match_id);return `<div class="card boost"><b>💪 יש לך ${a.total} שכיבות סמיכה לחלק</b><div>על התוצאה המדויקת${m?` ב${esc(team(m.home_team))} - ${esc(team(m.away_team))}`:''}. אפשר עד תחילת המשחק הבא.</div><button class="pri" type="button" data-pu="${a.id}" style="margin-top:8px">חלוקה</button></div>`}).join('')+(up.map(card).join('')||'<div class="center">אין משחקים קרובים</div>')+(past.length?`<details><summary>משחקים שהסתיימו (${past.length})</summary>${past.map(card).join('')}</details>`:'');
   }else if(tab==='live'){
     body=liveHtml();
   }else{
@@ -351,7 +351,7 @@ app.addEventListener('click',async e=>{
 document.addEventListener('click',e=>{const b=e.target.closest('[data-pu]');if(b)sheet('pu:'+b.dataset.pu)});
 function puHtml(id){
   const a=D.awards.find(x=>String(x.id)===String(id));
-  const head=`<div class="mi"><b>💪 חלוקת שכיבות שמיכה</b><button class="lnk" data-s="close">סגירה</button></div>`;
+  const head=`<div class="mi"><b>💪 חלוקת שכיבות סמיכה</b><button class="lnk" data-s="close">סגירה</button></div>`;
   if(!a||a.distributed_at||a.expired)return head+'<div class="hint">אין שכיבות לחלק</div>';
   const sid=D.matches.find(m=>m.id===a.match_id)?.season_id;
   const rows=D.standings.filter(r=>r.season_id===sid);
@@ -370,7 +370,7 @@ document.addEventListener('click',async e=>{
   if(!e.target.closest('[data-s="pusave"]'))return;
   const f=document.getElementById('puf'),t=Number(f.dataset.total),al=puAlloc(),s=al.reduce((a,x)=>a+x.count,0);
   if(s>t)return toast(ERR.pushups_over_limit,'err');
-  if(!confirm(s?`לחלק ${s} שכיבות שמיכה? אי אפשר לשנות אחרי השמירה.`:'לוותר על החלוקה? אי אפשר לשנות אחרי השמירה.'))return;
+  if(!confirm(s?`לחלק ${s} שכיבות סמיכה? אי אפשר לשנות אחרי השמירה.`:'לוותר על החלוקה? אי אפשר לשנות אחרי השמירה.'))return;
   const {error}=await sb.rpc('distribute_pushups',{p_award_id:Number(f.dataset.id),p_alloc:al});
   if(error)return fail(error);
   sheet(null);toast('השכיבות חולקו ✓','boost');await load();render();
@@ -446,9 +446,9 @@ const TOUR_FULL=[
   {sel:'[data-t=games]',t:'⚽ משחקים',b:'המשחקים הקרובים. מכניסים ניחוש לתוצאת 90 הדקות ושומרים. אפשר לערוך או למחוק את הניחוש עד שריקת הפתיחה.'},
   {sel:'[data-t=live]',t:'🔴 משחק נוכחי',b:'בזמן משחק רואים כאן את התוצאה החיה ואת הניחושים של כולם. הניחושים נחשפים בשריקת הפתיחה.'},
   {sel:'[data-t=table]',t:'🏆 טבלה',b:'בול שווה 5 נקודות, כיוון 3 (בשלבי ההכרעה של ליגת האלופות יותר). לחיצה על שם בטבלה מציגה את כל הניחושים של אותו שחקן.'},
-  {t:'💪 שכיבות שמיכה',b:'פגעת בבול? קיבלת שכיבות שמיכה לחלק לחברים (או לעצמך 😅). כרטיס החלוקה מופיע למעלה במסך המשחקים, ואפשר לחלק עד תחילת המשחק הבא.'},
+  {t:'💪 שכיבות סמיכה',b:'פגעת בבול? קיבלת שכיבות סמיכה לחלק לחברים (או לעצמך 😅). כרטיס החלוקה מופיע למעלה במסך המשחקים, ואפשר לחלק עד תחילת המשחק הבא.'},
   {t:'📣 התראות אחרי משחק',b:'אחרי כל משחק מגיעה הודעה אישית: פרגון על בול 🎯, עקיצה קטנה על פספוס 🙈, ודחיפה לקחת סיכון אחרי כמה כיוונים ברצף ➡️. ככל שהרצף ארוך יותר, ההודעה חזקה יותר 🔥'},
-  {sel:'#rbtn',t:'📖 חוקי המשחק',b:'כל החוקים במקום אחד: ניקוד, ליגת האלופות, שכיבות שמיכה ושוויון בטבלה.'},
+  {sel:'#rbtn',t:'📖 חוקי המשחק',b:'כל החוקים במקום אחד: ניקוד, ליגת האלופות, שכיבות סמיכה ושוויון בטבלה.'},
   {sel:'#sbtn',t:'🔊 צלילים',b:'צלילי האפליקציה, הודעות קוליות ומוזיקת רקע.'},
   {sel:'#gear',t:'⚙️ הגדרות',b:'התראות, תזכורת לנחש, התראות אחרי משחק, ערכת נושא (בית או חוץ), שם תצוגה, וגם הסיור הזה, אם תרצה לעבור עליו שוב.'},
   {t:'🎯 זהו, אתה מוכן!',b:'בהצלחה, ושיהיה בול! 💙❤️'}];
@@ -490,7 +490,7 @@ function playerHtml(id){
   const ms=D.matches.filter(m=>!m.voided&&D.guesses.some(g=>g.match_id===m.id&&g.user_id===id)).reverse();
   return `<div class="ph"><div class="mi"><b>${esc(u.display_name)}</b><button class="lnk" data-s="close">סגירה</button></div>
   <div class="sum"><span>נקודות: <b>${u.points}</b></span><span>ניחושים: <b>${L.length}</b></span><span>מדויקים: <b>${L.filter(x=>x.note==='exact').length}</b></span><span>כיוון: <b>${L.filter(x=>x.note==='direction').length}</b></span><span>💪 נשאר לבצע: <b>${owed(id)}</b></span></div>
-  ${(()=>{const got=D.gifts.filter(g=>g.to_user===id);return got.length?`<details><summary>שכיבות שמיכה שקיבל (${got.reduce((a,g)=>a+g.count,0)})</summary>${got.slice().reverse().map(g=>`<div class="mi"><span>${esc(uname(g.from_user))}</span><small>${dt(g.created_at)} · <b>${g.count}</b></small></div>`).join('')}</details>`:''})()}
+  ${(()=>{const got=D.gifts.filter(g=>g.to_user===id);return got.length?`<details><summary>שכיבות סמיכה שקיבל (${got.reduce((a,g)=>a+g.count,0)})</summary>${got.slice().reverse().map(g=>`<div class="mi"><span>${esc(uname(g.from_user))}</span><small>${dt(g.created_at)} · <b>${g.count}</b></small></div>`).join('')}</details>`:''})()}
   ${ms.map(m=>{
     const g=D.guesses.find(x=>x.match_id===m.id&&x.user_id===id);
     const rows=D.ledger.filter(x=>x.user_id===id&&x.match_id===m.id);
@@ -569,8 +569,8 @@ async function adminLoad(){
   <div class="mi"><b dir="ltr">${esc(data.invite_code)}</b><button class="pri" data-ad="code">שינוי</button></div>
   <h4>משתתפים (${ms.length})</h4>
   ${ms.map(u=>`<div class="mi"><div>${esc(u.name)}${u.admin?' 👑':''}<small dir="ltr">${esc(u.email)}</small><small>${u.approved?'חבר':'ממתין, לא הזין קוד'} · התראות: ${u.push>0?'כן':'לא'}</small></div><div>${u.id===me.id?'':`<button class="lnk" data-ad="appr" data-id="${u.id}" data-v="${u.approved?0:1}">${u.approved?'השעיה':'אישור'}</button> <button class="dng" data-ad="rm" data-id="${u.id}" data-n="${esc(u.name)}">הסרה</button>`}</div></div>`).join('')}
-  <h4>💪 שכיבות שמיכה</h4>
-  <small>סמן כמה שכיבות שמיכה שחקן ביצע בפועל. הסימון יורד מהחוב שלו.</small>
+  <h4>💪 שכיבות סמיכה</h4>
+  <small>סמן כמה שכיבות סמיכה שחקן ביצע בפועל. הסימון יורד מהחוב שלו.</small>
   ${ms.filter(u=>u.approved).map(u=>{const o=owed(u.id);return `<div class="mi"><span>${esc(u.name)}<small>נשאר לבצע: <b>${o}</b></small></span>${o>0?`<button class="pri" data-ad="pu" data-id="${u.id}" data-o="${o}" data-n="${esc(u.name)}">סימון ביצוע</button>`:''}</div>`}).join('')}
   <h4>ביטול משחק (דחייה / הפסקה)</h4>
   <small>מבטל את המשחק ומוחק את הניקוד ואת זכויות חלוקת השכיבות שלו. שכיבות שכבר חולקו נשארות. אי אפשר לשחזר.</small>
@@ -584,7 +584,7 @@ document.addEventListener('click',async e=>{
     if(!confirm('לבטל את המשחק? הניקוד שלו יימחק. אי אפשר לשחזר.'))return;
     r=await sb.rpc('void_match',{p_match_id:Number(id),p_reason:'admin'});
   }else if(a==='pu'){
-    const c=prompt(`כמה שכיבות שמיכה ${b.dataset.n} ביצע? (נשאר: ${b.dataset.o})`,b.dataset.o);if(!c)return;
+    const c=prompt(`כמה שכיבות סמיכה ${b.dataset.n} ביצע? (נשאר: ${b.dataset.o})`,b.dataset.o);if(!c)return;
     const n=Math.floor(Number(c));if(!(n>0&&n<=Number(b.dataset.o)))return toast(ERR.invalid_count,'err');
     r=await sb.rpc('admin_mark_pushups',{p_user_id:id,p_count:n});
   }else if(a==='rm'){
