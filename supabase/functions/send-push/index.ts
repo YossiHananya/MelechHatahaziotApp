@@ -1,5 +1,6 @@
 // Edge Function: send-push
-// Sends the guess reminder (per-user time) and the kickoff notification (see due_pushes() in 008_notifications.sql).
+// Sends the guess reminder (per-user time), the kickoff notification and the personal post-match result
+// (see due_pushes() in 010_result_notifications.sql).
 // Secrets: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (e.g. mailto:you@example.com), CRON_SECRET
 // Deploy with "Verify JWT" turned OFF.
 
@@ -113,18 +114,121 @@ const TEAMS_HE: [RegExp, string][] = [
   [/Andorra/i, "אנדורה"]
 ];
 const he = (n: string) => { for (const [re, h] of TEAMS_HE) if (re.test(n ?? "")) return h; return n; };
+// ---- post-match messages (approved pool, Nov 2026). Level = streak length (4 = 4 or more). ----
+// {name} {guess} {score} {points} {pushups} {streak} {exact_points}
+const POOL: Record<string, Record<number, string[]>> = {
+  exact: {
+    1: [
+      "🎯 בול! {score} בדיוק. פששש סחטיין {name} 👏🏼👏🏼 קיבלת {points}+ ו-{pushups} שכיבות סמיכה לחלק",
+      "🎯 מברוק על הבול! {score} כמו שאמרת. עכשיו תחליט מי מזיע: {pushups} שכיבות לחלק 😏",
+      "😎 מי מתעסק? זה {name}! בול {score}, {points}+ ו-{pushups} שכיבות סמיכה לחלק 👏🏼",
+    ],
+    2: [
+      "🎯🎯 בול שני ברצף! לא יאומן! {name} עושה בית ספר לכל הקבוצה 👏🏼👏🏼👏🏼",
+      "🔥🔥 דאבל בולים! \"מעכשיו כל משחק בול\" כבר לא נשמע כמו בדיחה",
+      "🎯🎯 שתיים משתיים! ימשיך כבודו 🙇‍♂️ עוד {pushups} שכיבות לחלק, ומישהו בקבוצה כבר מזיע 🤣",
+    ],
+    3: [
+      "🎯🎯🎯 שלושה בולים ברצף! מת העולםםם 😱 {name}, אתה פשוט בלתי אפשרי",
+      "🎶 אווו מלך התחזיות 🎶 שלושה ברצף! הכתר כבר בדרך אליך 👑",
+      "🧙‍♂️ שלוש ברצף?! בקבוצה דורשים לבדוק לך את כדור הבדולח 🤣 {points}+",
+    ],
+    4: [
+      "👑👑👑 {streak} בולים ברצף!!! מת העולםםםם! {name} המלך, כולם להשתחוות 🙇‍♂️",
+      "🚨🚨 {streak} ברצף! זה כבר לא ניחוש, זאת נבואה. הקבוצה מבקשת לראות את הניחוש שלך לפני כל משחק 🤣👏🏼",
+      "🔥🔥🔥🔥 {streak} בולים!!! בית ספר, אוניברסיטה ודוקטורט לכל הקבוצה. אגדה 👑👑👑",
+    ],
+  },
+  miss: {
+    1: [
+      "😅 הלך הבול... וגם הכיוון. ניחשת {guess}, יצא {score}. קורה גם לטובים ביותר",
+      "🙈 פספוס. זו לא בושה להפסיד לסלבדור 😅 המשחק הבא שלך!",
+      "😬 {guess}? באמת? יצא {score}. כיוון לאן רצית?? 🤣",
+    ],
+    2: [
+      "🙈🙈 פעמיים ברצף, {name}... אתה לא עומד במשבצת הנכונה 😂",
+      "📉 שני פספוסים. כדור הבדולח צריך טעינה. האמונה זה דבר חשוב 🙏🏼",
+      "🪱 מה רוצה התולעת? מחפשת חכה! שני פספוסים ברצף, {name}... במשחק הבא נדוג את הבול 🎣",
+    ],
+    3: [
+      "🔄 הפוך גוטה, הפוך! שלושה פספוסים ברצף, {name}. אולי הפעם פשוט תנחש הפוך ממה שבא לך 🤣",
+      "🚑 שלושה פספוסים ברצף! קוראים לצוות הרפואי 🤦🏻 אבל אנחנו מאמינים בך (בערך)",
+      "🫣 שלוש ברצף. אולי תנסה לנחש הפעם עם העיניים פתוחות? 😜",
+    ],
+    4: [
+      "😂🧱 {streak} ברצף, {name}. ביקשנו ממך לנחש תוצאות, לא לנחש בדיוק הפוך 🤣 אבל אנחנו איתך עד הבול הבא!",
+      "🆘🆘 {streak} פספוסים ברצף!!! בושה וחרפה 🤣 אבל תזכור את ה-6:1: הקאמבק הכי גדול מגיע כשאף אחד לא מאמין 💙❤️",
+      "🕯️🕯️ {streak} פספוסים. הדלקנו לך נר. אשרי המאמין, המשחק הבא שלך!",
+    ],
+  },
+  direction: {   // sent only from the 2nd direction-only result in a row
+    2: [
+      "👍 שוב כיוון! {points} נקודות זה יפה, אבל בול זה {exact_points} ושכיבות סמיכה לחלק לחברים 😏",
+      "🛡️ משחק בטוח, {name}. יציב כמו קיר. אולי הפעם תעז על בול?",
+      "🌿 הניחוש שלך דומה לתוצאה כמו שני עלים של נענע... כמעט 😏 כיוון שני ברצף, עכשיו תעז על בול",
+    ],
+    3: [
+      "🚌 שלושה כיוונים ברצף. חנית את האוטובוס? בארסה לא משחקת על 1:0, תעז!",
+      "😴 שלושה כיוונים... יציב אבל משעמם. הגיע הזמן ל-6:2 מטורף?",
+      "🎯 את הכיוון כבר יש לך. כמו שאומרים בקבוצה: אם אתה בכיוון, תקלע בול!",
+    ],
+    4: [
+      "🧊👑 {streak} כיוונים ברצף! מלך הסולידיות. אבל מלך התחזיות פוגע בול. קח סיכון!",
+      "⏱️ {streak} פעמים כמעט. אתה 13 שניות מבול 🤣 בפעם הבאה, לך על זה!",
+      "🦁 {streak} כיוונים... את הקריאה של המשחק יש לך, חסר רק האומץ. תוצאה מדויקת, עכשיו! 🔥",
+    ],
+  },
+};
+const TITLE: Record<string, string> = { exact: "🎯 בול!", miss: "🙈 פספוס", direction: "➡️ שוב כיוון" };
+const firstName = (n: string) => String(n ?? "").trim().split(/\s+/)[0] || "אלוף";
+
+// Picks a message for this outcome and streak, never the same one the player got last time.
+// Returns the text and its key ("exact-2-1") to remember in push_log.
+export function pickResult(outcome: string, streak: number, last: string | null, rnd = Math.random) {
+  const levels = POOL[outcome];
+  const min = Math.min(...Object.keys(levels).map(Number));
+  const level = Math.max(min, Math.min(4, streak || 1));
+  const list = levels[level];
+  const keys = list.map((_, i) => `${outcome}-${level}-${i}`);
+  const allowed = keys.map((_, i) => i).filter((i) => keys[i] !== last);
+  const i = allowed[Math.floor(rnd() * allowed.length)];
+  return { text: list[i], variant: keys[i] };
+}
+
+// deno-lint-ignore no-explicit-any
+export function fill(t: string, r: any) {
+  const v: Record<string, string> = {
+    name: firstName(r.display_name),
+    guess: `${r.my_home}:${r.my_away}`,
+    score: `${r.reg_home}:${r.reg_away}`,
+    points: String(r.points ?? 0),
+    pushups: String(r.exact_points ?? 5),
+    streak: String(r.streak ?? 1),
+    exact_points: String(r.exact_points ?? 5),
+  };
+  return t.replace(/\{(\w+)\}/g, (m, k) => v[k] ?? m);
+}
+
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
 
 // deno-lint-ignore no-explicit-any
 function payload(r: any) {
   const game = `${he(r.home_team)} נגד ${he(r.away_team)}`;
+  if (r.kind === "result") {
+    const { text, variant } = pickResult(r.outcome, r.streak, r.last_variant);
+    return {
+      title: `${TITLE[r.outcome] ?? "מלך התחזיות"} · ${he(r.home_team)} ${r.reg_home}:${r.reg_away} ${he(r.away_team)}`,
+      body: fill(text, r),
+      tag: `result-${r.match_id}`, url: "./?tab=table", ttl: 12 * 3600, variant,
+    };
+  }
   if (r.kind === "kickoff") {
     const mine = r.my_home != null ? `הניחוש שלך: ${r.my_home}:${r.my_away}` : "לא ניחשת במשחק הזה";
     return {
       title: "⚽ המשחק התחיל!",
       body: `${game} · ${mine}. הניחושים של כולם נחשפו.`,
-      tag: `kickoff-${r.match_id}`, url: "./?tab=live", ttl: 1800,
+      tag: `kickoff-${r.match_id}`, url: "./?tab=live", ttl: 1800, variant: null as string | null,
     };
   }
   // "guess" reminder
@@ -136,7 +240,7 @@ function payload(r: any) {
   return {
     title: `⏰ המשחק מתחיל בעוד ${when}`,
     body: `${game} · עדיין לא ניחשת. מהרו לנחש!`,
-    tag: `guess-${r.match_id}`, url: "./", ttl: Math.min(mins * 60, 24 * 3600),
+    tag: `guess-${r.match_id}`, url: "./", ttl: Math.min(mins * 60, 24 * 3600), variant: null as string | null,
   };
 }
 
@@ -181,7 +285,7 @@ Deno.serve(async (req) => {
       }
       if (ok > 0) {
         await supabase.from("push_log").upsert(
-          { match_id: rows[0].match_id, user_id: rows[0].user_id, kind: rows[0].kind },
+          { match_id: rows[0].match_id, user_id: rows[0].user_id, kind: rows[0].kind, variant: p.variant },
           { onConflict: "match_id,user_id,kind", ignoreDuplicates: true });
         sent++;
       }
