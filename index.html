@@ -74,6 +74,14 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}input[type=num
 .lg{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;font-size:.8rem;color:var(--mut);margin:6px 0}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:4px;vertical-align:middle}
 .mv{font-size:.75rem;font-weight:700;margin-inline-start:4px}.up{color:#18884a}.dn{color:#c0392b}.prov{color:#18884a;font-size:.8rem;font-weight:700;margin-inline-start:4px}
 tr.chg td{animation:flash 1.2s ease}@keyframes flash{from{background:#e4c46655}}
+.sw{position:relative;display:inline-block;width:46px;height:26px;flex:none}.sw input{opacity:0;width:0;height:0;position:absolute}.sw i{position:absolute;inset:0;border-radius:26px;background:var(--line);transition:background .2s}.sw i:before{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0004;transition:transform .2s}.sw input:checked+i{background:var(--p2)}[data-theme=away] .sw input:checked+i{background:var(--acc)}.sw input:checked+i:before{transform:translateX(-20px)}.sw input:focus-visible+i{outline:2px solid var(--acc)}
+.mi.sub{padding-inline-start:22px;font-size:.92rem}
+#panel .mi>span>small{display:block}
+#tour{position:fixed;inset:0;z-index:20}#tour .dim{position:fixed;inset:0;background:#000a}
+#tour .hole{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px #000a;pointer-events:none;outline:2px solid var(--acc);transition:all .3s ease}
+#tour .tc{position:fixed;inset-inline:16px;max-width:420px;margin:0 auto;background:var(--card);color:var(--ink);border-radius:16px;padding:16px;box-shadow:0 10px 30px #0007;animation:up .3s ease both}
+#tour .tc b{font-size:1.08rem}#tour .tc p{margin:8px 0 12px}
+#tour .tb{display:flex;justify-content:space-between;align-items:center;gap:8px}#tour .tb span{color:var(--mut);font-size:.85rem}
 </style>
 </head>
 <body>
@@ -165,7 +173,7 @@ async function boot(session){
   me=p;if(!me){app.innerHTML='<div class="center">יוצר פרופיל…</div>';return setTimeout(async()=>boot((await sb.auth.getSession()).data.session),1500)}
   if(!me.is_approved)return join();
   document.getElementById('hb').hidden=false;updSoundIcon();
-  await load();PS=await pushState();render();resync();
+  await load();PS=await pushState();render();resync();maybeTour();
 }
 function login(){
   const gis=!!C.GOOGLE_CLIENT_ID;
@@ -420,6 +428,60 @@ document.addEventListener('change',async e=>{
   if(error){e.target.value=String(me.reminder_minutes??'');return fail(error)}
   me.reminder_minutes=v;toast(v?'התזכורת עודכנה ✓':'התזכורת כובתה ✓');
 });
+// ---- post-match notifications (separate from the guess reminder) ----
+const SW=(id,on)=>`<label class="sw"><input type="checkbox" id="${id}"${on?' checked':''}><i></i></label>`;
+const RN=[['ne','notify_exact','🎯 בול (תוצאה מדויקת)'],['nm','notify_miss','🙈 פספוס'],['nd','notify_direction','➡️ רצף כיוונים']];
+document.addEventListener('change',async e=>{
+  const id=e.target.id,map={nr:'notify_results',ne:'notify_exact',nm:'notify_miss',nd:'notify_direction'};
+  if(!map[id])return;
+  const prev=me[map[id]],v=e.target.checked;me[map[id]]=v;
+  const {error}=await sb.rpc('set_result_notifications',{p_all:me.notify_results!==false,p_exact:me.notify_exact!==false,p_miss:me.notify_miss!==false,p_direction:me.notify_direction!==false});
+  if(error){me[map[id]]=prev;sheet('main');return fail(error)}
+  toast(v?'הופעל ✓':'כובה ✓');sheet('main');
+});
+// ---- tours: "what's new" once per version (skippable), and the full tour from the settings ----
+const TOUR_V=2;
+const TOUR_FULL=[
+  {t:'👑 ברוך הבא למלך התחזיות',b:'כאן מנחשים את התוצאות של ברצלונה בלה ליגה ובליגת האלופות, ומתחרים בחברים מהקבוצה. בוא נעשה סיבוב קצר.'},
+  {sel:'[data-t=games]',t:'⚽ משחקים',b:'המשחקים הקרובים. מכניסים ניחוש לתוצאת 90 הדקות ושומרים. אפשר לערוך או למחוק את הניחוש עד שריקת הפתיחה.'},
+  {sel:'[data-t=live]',t:'🔴 משחק נוכחי',b:'בזמן משחק רואים כאן את התוצאה החיה ואת הניחושים של כולם. הניחושים נחשפים בשריקת הפתיחה.'},
+  {sel:'[data-t=table]',t:'🏆 טבלה',b:'בול שווה 5 נקודות, כיוון 3 (בשלבי ההכרעה של ליגת האלופות יותר). לחיצה על שם בטבלה מציגה את כל הניחושים של אותו שחקן.'},
+  {t:'💪 שכיבות שמיכה',b:'פגעת בבול? קיבלת שכיבות שמיכה לחלק לחברים (או לעצמך 😅). כרטיס החלוקה מופיע למעלה במסך המשחקים, ואפשר לחלק עד תחילת המשחק הבא.'},
+  {t:'📣 התראות אחרי משחק',b:'אחרי כל משחק מגיעה הודעה אישית: פרגון על בול 🎯, עקיצה קטנה על פספוס 🙈, ודחיפה לקחת סיכון אחרי כמה כיוונים ברצף ➡️. ככל שהרצף ארוך יותר, ההודעה חזקה יותר 🔥'},
+  {sel:'#rbtn',t:'📖 חוקי המשחק',b:'כל החוקים במקום אחד: ניקוד, ליגת האלופות, שכיבות שמיכה ושוויון בטבלה.'},
+  {sel:'#sbtn',t:'🔊 צלילים',b:'צלילי האפליקציה, הודעות קוליות ומוזיקת רקע.'},
+  {sel:'#gear',t:'⚙️ הגדרות',b:'התראות, תזכורת לנחש, התראות אחרי משחק, ערכת נושא (בית או חוץ), שם תצוגה, וגם הסיור הזה, אם תרצה לעבור עליו שוב.'},
+  {t:'🎯 זהו, אתה מוכן!',b:'בהצלחה, ושיהיה בול! 💙❤️'}];
+const tourNew=()=>[
+  {t:'🆕 מה חדש במלך התחזיות',b:'מעכשיו, אחרי כל משחק, מגיעה הודעה אישית על הניחוש שלך: פרגון על בול 🎯, עקיצה קטנה על פספוס 🙈, ודחיפה לקחת סיכון אחרי כמה כיוונים ברצף ➡️. ככל שהרצף ארוך יותר, ההודעה חזקה יותר 🔥'},
+  {sel:'#gear',t:'⚙️ הגדרות נפרדות',b:'בהגדרות יש עכשיו "התראות אחרי משחק", בנפרד מהתזכורת לנחש. אפשר לכבות את כולן, או רק סוג אחד (בול, פספוס או כיוונים).'+(PS==='on'?'':' כדי לקבל אותן צריך להפעיל קודם את ההתראות (🔔) באותו מסך.')},
+  {sel:'#gear',t:'🧭 סיור באפליקציה',b:'רוצה לעבור על כל האפליקציה מההתחלה? בהגדרות יש "סיור באפליקציה", ואפשר להפעיל אותו מתי שרוצים.'}];
+function tour(steps,onEnd){
+  document.getElementById('tour')?.remove();
+  const el=document.createElement('div');el.id='tour';el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');document.body.append(el);
+  let i=0;window.scrollTo(0,0);
+  const show=()=>{
+    const s=steps[i],last=i===steps.length-1,t=s.sel&&document.querySelector(s.sel),r=t&&t.getBoundingClientRect();
+    const pos=!r?'top:22%':r.top<innerHeight/2?`top:${r.bottom+16}px`:`bottom:${innerHeight-r.top+16}px`;
+    el.innerHTML=`${r?`<div class="hole" style="top:${r.top-6}px;left:${r.left-6}px;width:${r.width+12}px;height:${r.height+12}px"></div>`:'<div class="dim"></div>'}
+    <div class="tc" style="${pos}"><b>${s.t}</b><p>${s.b}</p><div class="tb"><div>${last?'':'<button class="lnk" data-tr="end">דילוג</button>'}</div><span>${i+1}/${steps.length}</span><div>${i?'<button class="lnk" data-tr="prev">הקודם</button> ':''}<button class="pri" data-tr="${last?'end':'next'}">${last?'סיום':'הבא'}</button></div></div></div>`;
+    el.querySelector('.tb .pri')?.focus({preventScroll:true});
+  };
+  const end=()=>{el.remove();removeEventListener('resize',show);onEnd?.()};
+  el.addEventListener('click',e=>{const a=e.target.closest('[data-tr]')?.dataset.tr;if(a==='next'){i++;show()}else if(a==='prev'){i--;show()}else if(a==='end')end()});
+  el.addEventListener('keydown',e=>{if(e.key==='Escape')end()});
+  addEventListener('resize',show);show();
+}
+const seenTour=()=>{let l=0;try{l=Number(localStorage.getItem('tourv'))||0}catch{}return Math.max(l,me?.tour_version||0)};
+function markTour(){
+  try{localStorage.setItem('tourv',String(TOUR_V))}catch{}
+  me.tour_version=TOUR_V;sb.rpc('set_tour_seen',{p_version:TOUR_V}).then(({error})=>{if(error)console.warn(error)});
+}
+function maybeTour(){
+  if(seenTour()>=TOUR_V)return;
+  const isNew=!D.guesses.some(g=>g.user_id===me.id);   // never guessed: the full tour; otherwise only what's new
+  setTimeout(()=>{if(!document.getElementById('tour'))tour(isNew?TOUR_FULL:tourNew(),markTour)},700);
+}
 const NOTE={exact:'מדויק',direction:'כיוון',miss:'פספוס'};
 function playerHtml(id){
   const u=D.standings.find(r=>r.user_id===id);
@@ -457,10 +519,13 @@ function menuHtml(v){
   const inst=dip?'<button class="pri" data-s="inst">התקנה</button>':`<small>${ios?'שיתוף ← הוסף למסך הבית':'תפריט הדפדפן ← התקנה'}</small>`;
   return `<div class="mi"><b>הגדרות</b><button class="lnk" data-s="close">סגירה</button></div>
   <div class="mi"><span>🔔 התראות</span>${notif}</div>
-  ${PS==='on'?`<div class="mi"><span>⏰ תזכורת לנחש<small>אם עוד לא ניחשת · בנוסף תמיד מגיעה התראה כשמשחק מתחיל</small></span><select id="rem" style="font:inherit;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)">${REM.map(([v,t])=>`<option value="${v}"${String(me.reminder_minutes??'')===String(v)?' selected':''}>${t}</option>`).join('')}</select></div>`:''}
+  ${PS==='on'?`<div class="mi"><span>⏰ תזכורת לנחש<small>אם עוד לא ניחשת · בנוסף תמיד מגיעה התראה כשמשחק מתחיל</small></span><select id="rem" style="font:inherit;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)">${REM.map(([v,t])=>`<option value="${v}"${String(me.reminder_minutes??'')===String(v)?' selected':''}>${t}</option>`).join('')}</select></div>
+  <div class="mi"><span>📣 התראות אחרי משחק<small>הודעה אישית על הניחוש שלך כשהמשחק נגמר · נפרד מהתזכורת לנחש</small></span>${SW('nr',me.notify_results!==false)}</div>
+  ${me.notify_results!==false?RN.map(([id,k,t])=>`<div class="mi sub"><span>${t}</span>${SW(id,me[k]!==false)}</div>`).join(''):''}`:''}
   ${standalone?'':`<div class="mi"><span>📲 התקנת אפליקציה</span>${inst}</div>`}
   <div class="mi"><span>🎨 ערכת נושא: ${th}</span><button class="pri" data-s="theme">החלפה</button></div>
   <div class="mi"><span>✏️ שם תצוגה: <b>${esc(me.display_name)}</b></span><button class="pri" data-s="name">עריכה</button></div>
+  <div class="mi"><span>🧭 סיור באפליקציה<small>מעבר קצר על כל המסכים</small></span><button class="pri" data-s="tour">התחלה</button></div>
   ${me.is_admin?'<div class="mi"><span>🛠️ ניהול</span><button class="pri" data-s="admin">פתיחה</button></div>':''}
   <div class="mi"><span></span><button class="lnk" data-s="out">התנתקות</button></div>`;
 }
@@ -479,6 +544,7 @@ document.addEventListener('click',async e=>{
   else if(a==='sfx'){const on=!sfxOn();setSfx(on);if(on)sfx('ok');updSoundIcon();sheet('sound')}
   else if(a==='voice'){setVoice(!voiceOn());updSoundIcon();sheet('sound')}
   else if(a==='music'){musicSet(!musicPlaying());setTimeout(()=>{updSoundIcon();sheet('sound')},200)}
+  else if(a==='tour'){sheet(null);tour(TOUR_FULL)}
   else if(a==='pon')await pushOn();
   else if(a==='poff')await pushOff();
 });
