@@ -12,4 +12,13 @@ window.APP_CONFIG = {
     // score_taken: "voice/score_taken.mp3", // no longer used: the same score may now be picked by several players
     // guess_window_closed: 'voice/guess_window_closed.mp3',
   },
+  // voice pools: one file is picked at random for each event (put the files in the voice/ folder)
+  // exact = תוצאה מדויקת · direction = כיוון · miss = פספוס · no_guess = לא ניחש · reminder = תזכורת לנחש
+  VOICE_POOLS: {
+    exact: [],
+    direction: [],
+    miss: [],
+    no_guess: [],
+    reminder: [],
+  },
 };

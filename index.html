@@ -38,6 +38,7 @@ button.pri,form.g button{background:var(--p2);color:#fff;border:0;border-radius:
 .hint{font-size:.8rem;color:var(--mut);text-align:center;margin-top:4px}
 table{width:100%;border-collapse:collapse}th,td{padding:9px 6px;text-align:start;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:500;font-size:.85rem}
 td.n{font-weight:700}
+#vbtn{position:fixed;inset-inline:16px;bottom:calc(80px + env(safe-area-inset-bottom));z-index:9;padding:12px 14px;border:0;border-radius:999px;background:var(--p2,#a50044);color:#fff;font:inherit;font-weight:700;box-shadow:0 4px 14px #0004;animation:vpulse 1.6s ease-in-out infinite}#vbtn[hidden]{display:none}@keyframes vpulse{50%{transform:scale(1.04)}}
 #msg{position:fixed;inset-inline:16px;bottom:calc(16px + env(safe-area-inset-bottom));background:#222;color:#fff;padding:12px 14px;border-radius:12px;display:none;z-index:9;text-align:center}
 .center{text-align:center;padding:40px 10px}.center input{font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;margin:10px 0;width:100%;max-width:260px;text-align:center;background:var(--card);color:var(--ink)}
 .boost{background:var(--bg);border:2px dashed var(--acc);border-radius:12px;padding:10px;margin:8px 0;text-align:center;font-size:.92rem}.bs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}.bs button{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:700}.rules h3{margin:16px 0 4px;color:var(--p2)}.rules h3:first-child{margin-top:0}.rules li,.rules p{margin:4px 0}.rules ol,.rules ul{padding-inline-start:22px;margin:4px 0}
@@ -87,7 +88,7 @@ tr.chg td{animation:flash 1.2s ease}@keyframes flash{from{background:#e4c46655}}
 <body>
 <header><h1><img src="icon.svg" alt="" width="34" height="34">מלך התחזיות</h1><div id="hb" hidden><button id="rbtn" aria-label="חוקי המשחק">📖</button><button id="sbtn" aria-label="צלילים">🔊</button><button id="gear" aria-label="הגדרות">⚙️</button></div></header>
 <main id="app"><div class="center">טוען…</div></main>
-<div id="msg"></div>
+<div id="msg"></div><button id="vbtn" hidden>🔊 יש לך הודעה קולית · הקש להשמעה</button>
 <div id="sheet" hidden><div class="back"></div><div class="panel" id="panel"></div></div>
 <script src="config.js"></script>
 <script src="teams.js"></script>
@@ -123,6 +124,8 @@ function sfx(k){
 }
 // ---- voice messages played when a player breaks a rule (files listed in config.js VOICE_FILES) ----
 const VF=()=>C.VOICE_FILES||{};
+const VPOOL=()=>C.VOICE_POOLS||{};
+const hasPools=()=>Object.values(VPOOL()).some(a=>Array.isArray(a)&&a.length);
 const hasVoices=()=>Object.values(VF()).some(Boolean);
 const voiceOn=()=>{try{return localStorage.getItem('voice')!=='0'}catch{return true}};
 const setVoice=v=>{try{localStorage.setItem('voice',v?'1':'0')}catch{}};
@@ -134,6 +137,47 @@ function voice(k){
   }
   sfx('err');
 }
+// ---- voice pools: after a match (exact / direction / miss / no guess) and the guess reminder ----
+// config.js VOICE_POOLS lists the files of each event; one is picked at random (not the same one twice in a row)
+const vresOn=()=>{try{return localStorage.getItem('vres')!=='0'}catch{return true}};
+const setVres=v=>{try{localStorage.setItem('vres',v?'1':'0')}catch{}};
+const lsJ=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
+const lsS=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+let VP=null,vpUnlocked=false,vq=[],vBusy=false;
+function pickVoice(kind){
+  const L=(VPOOL()[kind]||[]).filter(Boolean);if(!L.length)return null;
+  const last=lsJ('vlast',{});let opts=L.length>1?L.filter(f=>f!==last[kind]):L;
+  const f=opts[Math.floor(Math.random()*opts.length)];last[kind]=f;lsS('vlast',last);return f;
+}
+function vNext(){
+  const b=document.getElementById('vbtn');
+  if(vBusy||!vq.length){if(b&&!vq.length)b.hidden=true;return}
+  if(b)b.hidden=true;
+  const f=vq.shift();vBusy=true;VP=VP||new Audio();VP.muted=false;VP.src=f;VP.currentTime=0;
+  const done=()=>{vBusy=false;VP.onended=VP.onerror=null;setTimeout(vNext,400)};
+  VP.onended=done;VP.onerror=done;
+  VP.play().catch(()=>{vBusy=false;vpUnlocked=false;vq.unshift(f);if(b)b.hidden=false});
+}
+function playPool(kind){if(!vresOn())return;const f=pickVoice(kind);if(f){vq.push(f);vNext()}}
+// what to say now: the result of the last settled match (once), and the reminder for a match not guessed yet (once)
+function checkVoices(){
+  if(!me?.is_approved||!hasPools()||!D.matches)return;
+  const heard=lsJ('vheard',[]),now=Date.now(),mark=k=>{heard.push(k);lsS('vheard',heard.slice(-60))};
+  const done=D.matches.filter(m=>m.settled_at&&!m.voided&&now-Date.parse(m.settled_at)<24*36e5)
+    .sort((a,b)=>Date.parse(b.utc_date)-Date.parse(a.utc_date));
+  const m=done[0];
+  if(m&&!heard.includes('r'+m.id)){
+    const l=D.ledger.find(x=>x.user_id===me.id&&x.match_id===m.id&&x.kind==='guess');
+    const joined=me.created_at?Date.parse(me.created_at):0;
+    const kind=l?({exact:'exact',direction:'direction',miss:'miss'})[l.note]:(joined<Date.parse(m.utc_date)?'no_guess':null);
+    mark('r'+m.id);if(kind)playPool(kind);
+  }
+  const mins=me.reminder_minutes;
+  if(mins){
+    const nx=D.matches.find(x=>!x.voided&&['SCHEDULED','TIMED'].includes(x.status)&&Date.parse(x.utc_date)>now&&Date.parse(x.utc_date)-now<=mins*6e4);
+    if(nx&&!heard.includes('g'+nx.id)&&!D.guesses.some(g=>g.match_id===nx.id&&g.user_id===me.id)){mark('g'+nx.id);playPool('reminder')}
+  }
+}
 function fail(e){
   const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));
   toast(errText(e),'none');voice(k||'generic');
@@ -142,10 +186,14 @@ function fail(e){
 function unlockAudio(){
   document.removeEventListener('click',unlockAudio,true);
   try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();AC.resume()}catch{}
+  if(hasPools()&&!vpUnlocked){const f=Object.values(VPOOL()).flat().find(Boolean);VP=VP||new Audio();
+    if(vq.length){vpUnlocked=true;vNext()}
+    else{VP.src=f;VP.muted=true;VP.play().then(()=>{VP.pause();VP.muted=false;vpUnlocked=true;vNext()}).catch(()=>{VP.muted=false})}}
   for(const [k,f] of Object.entries(VF())){if(!f||vcache[k])continue;const a=vcache[k]=new Audio(f);a.muted=true;a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false}).catch(()=>{a.muted=false})}
 }
 document.addEventListener('click',unlockAudio,true);
-function updSoundIcon(){const b=document.getElementById('sbtn');if(b)b.textContent=(sfxOn()||(hasVoices()&&voiceOn())||musicPlaying())?'🔊':'🔇'}
+document.addEventListener('click',()=>{if(vq.length&&!vBusy){vpUnlocked=true;vNext()}},true);
+function updSoundIcon(){const b=document.getElementById('sbtn');if(b)b.textContent=(sfxOn()||(hasVoices()&&voiceOn())||(hasPools()&&vresOn())||musicPlaying())?'🔊':'🔇'}
 // ---- background music (optional: set MUSIC_URL in config.js) ----
 let music=null;
 const musicPref=()=>{try{return localStorage.getItem('music')==='1'}catch{return false}};
@@ -158,7 +206,7 @@ function musicSet(on){
 }
 const musicFirstTap=e=>{if(e.target.closest('#sheet'))return;document.removeEventListener('click',musicFirstTap);if(musicPref()&&C.MUSIC_URL&&!music)musicSet(true)};
 document.addEventListener('click',musicFirstTap);
-if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',async e=>{if(e.data?.type==='push')sfx('chime');if(e.data?.type==='open'&&/tab=live/.test(e.data.url||'')&&me?.is_approved){tab='live';await load();render()}});
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',async e=>{if(e.data?.type==='push'){sfx('chime');if(me?.is_approved&&hasPools()&&/^(result|guess)-/.test(e.data.tag||'')){await load();if(document.getElementById('sheet').hidden)render();checkVoices()}}if(e.data?.type==='open'&&/tab=live/.test(e.data.url||'')&&me?.is_approved){tab='live';await load();render()}});
 const errText=e=>{const k=Object.keys(ERR).find(k=>(e.message||'').includes(k));return k?ERR[k]:'משהו השתבש, נסה שוב'+(e.message?' ('+String(e.message).slice(0,50)+')':'')};
 
 function toggleTheme(){const h=document.documentElement,t=h.dataset.theme==='home'?'away':'home';h.dataset.theme=t;try{localStorage.setItem('theme',t)}catch{}}
@@ -173,7 +221,7 @@ async function boot(session){
   me=p;if(!me){app.innerHTML='<div class="center">יוצר פרופיל…</div>';return setTimeout(async()=>boot((await sb.auth.getSession()).data.session),1500)}
   if(!me.is_approved)return join();
   document.getElementById('hb').hidden=false;updSoundIcon();
-  await load();PS=await pushState();render();resync();maybeTour();
+  await load();PS=await pushState();render();resync();maybeTour();checkVoices();
 }
 function login(){
   const gis=!!C.GOOGLE_CLIENT_ID;
@@ -325,7 +373,7 @@ setInterval(async()=>{
   if(document.activeElement?.matches?.('input'))return;   // don't wipe a guess being typed
   await load();if(document.getElementById('sheet').hidden)render();
 },45e3);
-document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me?.is_approved&&D.matches&&liveMatch()){await load();render()}});
+document.addEventListener('visibilitychange',async()=>{if(document.hidden||!me?.is_approved||!D.matches)return;if(liveMatch()){await load();render()}else if(hasPools()){await load();if(document.getElementById('sheet').hidden)render()}checkVoices()});
 // desktop: the mouse wheel must not change a number field
 document.addEventListener('wheel',e=>{if(e.target.matches?.('input[type=number]')&&document.activeElement===e.target)e.target.blur()},{passive:true});
 app.addEventListener('click',e=>{
@@ -507,6 +555,7 @@ function menuHtml(v){
   if(v==='sound')return `<div class="mi"><b>צלילים</b><button class="lnk" data-s="close">סגירה</button></div>
   <div class="mi"><span>🔊 צלילי האפליקציה</span><button class="pri" data-s="sfx">${sfxOn()?'השתקה':'הפעלה'}</button></div>
   ${hasVoices()?`<div class="mi"><span>🗣️ הודעות קוליות (כשמפרים חוק)</span><button class="pri" data-s="voice">${voiceOn()?'השתקה':'הפעלה'}</button></div>`:''}
+  ${hasPools()?`<div class="mi"><span>📢 הודעות קוליות אחרי משחק ובתזכורת<small>בול, כיוון, פספוס, לא ניחשת · נשמעות כשהאפליקציה פתוחה</small></span><button class="pri" data-s="vres">${vresOn()?'השתקה':'הפעלה'}</button></div>`:''}
   ${C.MUSIC_URL?`<div class="mi"><span>🎵 מוזיקת רקע</span><button class="pri" data-s="music">${musicPlaying()?'עצירה':'הפעלה'}</button></div>`:''}
   <small class="hint">צלילי התראות (כשהאפליקציה סגורה) נקבעים בהגדרות הטלפון.</small>`;
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -543,6 +592,7 @@ document.addEventListener('click',async e=>{
   else if(a==='inst'&&dip){dip.prompt();await dip.userChoice;dip=null;sheet('main')}
   else if(a==='sfx'){const on=!sfxOn();setSfx(on);if(on)sfx('ok');updSoundIcon();sheet('sound')}
   else if(a==='voice'){setVoice(!voiceOn());updSoundIcon();sheet('sound')}
+  else if(a==='vres'){const on=!vresOn();setVres(on);if(!on){vq=[];VP?.pause();vNext()}updSoundIcon();sheet('sound')}
   else if(a==='music'){musicSet(!musicPlaying());setTimeout(()=>{updSoundIcon();sheet('sound')},200)}
   else if(a==='tour'){sheet(null);tour(TOUR_FULL)}
   else if(a==='pon')await pushOn();
