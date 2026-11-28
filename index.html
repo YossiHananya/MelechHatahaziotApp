@@ -153,7 +153,7 @@ function vNext(){
   const b=document.getElementById('vbtn');
   if(vBusy||!vq.length){if(b&&!vq.length)b.hidden=true;return}
   if(b)b.hidden=true;
-  const f=vq.shift();vBusy=true;VP=VP||new Audio();VP.muted=false;VP.src=f;VP.currentTime=0;
+  const f=vq.shift();vBusy=true;VP=VP||new Audio();VP.muted=false;VP.src=encodeURI(f);VP.currentTime=0;
   const done=()=>{vBusy=false;VP.onended=VP.onerror=null;setTimeout(vNext,400)};
   VP.onended=done;VP.onerror=done;
   VP.play().catch(()=>{vBusy=false;vpUnlocked=false;vq.unshift(f);if(b)b.hidden=false});
@@ -188,7 +188,7 @@ function unlockAudio(){
   try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();AC.resume()}catch{}
   if(hasPools()&&!vpUnlocked){const f=Object.values(VPOOL()).flat().find(Boolean);VP=VP||new Audio();
     if(vq.length){vpUnlocked=true;vNext()}
-    else{VP.src=f;VP.muted=true;VP.play().then(()=>{VP.pause();VP.muted=false;vpUnlocked=true;vNext()}).catch(()=>{VP.muted=false})}}
+    else{VP.src=encodeURI(f);VP.muted=true;VP.play().then(()=>{VP.pause();VP.muted=false;vpUnlocked=true;vNext()}).catch(()=>{VP.muted=false})}}
   for(const [k,f] of Object.entries(VF())){if(!f||vcache[k])continue;const a=vcache[k]=new Audio(f);a.muted=true;a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false}).catch(()=>{a.muted=false})}
 }
 document.addEventListener('click',unlockAudio,true);
