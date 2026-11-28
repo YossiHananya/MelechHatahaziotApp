@@ -221,7 +221,7 @@ async function boot(session){
   me=p;if(!me){app.innerHTML='<div class="center">יוצר פרופיל…</div>';return setTimeout(async()=>boot((await sb.auth.getSession()).data.session),1500)}
   if(!me.is_approved)return join();
   document.getElementById('hb').hidden=false;updSoundIcon();
-  await load();PS=await pushState();render();resync();maybeTour();checkVoices();
+  await load();PS=await pushState();render();resync();if(!maybeTour())checkVoices();
 }
 function login(){
   const gis=!!C.GOOGLE_CLIENT_ID;
@@ -488,7 +488,9 @@ document.addEventListener('change',async e=>{
   toast(v?'הופעל ✓':'כובה ✓');sheet('main');
 });
 // ---- tours: "what's new" once per version (skippable), and the full tour from the settings ----
-const TOUR_V=2;
+// RULE: every release that changes what players see bumps TOUR_V and rewrites tourNew() ("what's new"),
+// and TOUR_FULL is kept up to date with the change.
+const TOUR_V=3;
 const TOUR_FULL=[
   {t:'👑 ברוך הבא למלך התחזיות',b:'כאן מנחשים את התוצאות של ברצלונה בלה ליגה ובליגת האלופות, ומתחרים בחברים מהקבוצה. בוא נעשה סיבוב קצר.'},
   {sel:'[data-t=games]',t:'⚽ משחקים',b:'המשחקים הקרובים. מכניסים ניחוש לתוצאת 90 הדקות ושומרים. אפשר לערוך או למחוק את הניחוש עד שריקת הפתיחה.'},
@@ -497,12 +499,14 @@ const TOUR_FULL=[
   {t:'💪 שכיבות סמיכה',b:'פגעת בבול? קיבלת שכיבות סמיכה לחלק לחברים (או לעצמך 😅). כרטיס החלוקה מופיע למעלה במסך המשחקים, ואפשר לחלק עד תחילת המשחק הבא.'},
   {t:'📣 התראות אחרי משחק',b:'אחרי כל משחק מגיעה הודעה אישית: פרגון על בול 🎯, עקיצה קטנה על פספוס 🙈, ודחיפה לקחת סיכון אחרי כמה כיוונים ברצף ➡️. ככל שהרצף ארוך יותר, ההודעה חזקה יותר 🔥'},
   {sel:'#rbtn',t:'📖 חוקי המשחק',b:'כל החוקים במקום אחד: ניקוד, ליגת האלופות, שכיבות סמיכה ושוויון בטבלה.'},
-  {sel:'#sbtn',t:'🔊 צלילים',b:'צלילי האפליקציה, הודעות קוליות ומוזיקת רקע.'},
+  {sel:'#sbtn',t:'🔊 צלילים',b:'צלילי האפליקציה, מוזיקת רקע והודעות קוליות מהחבר׳ה: אחרי כל משחק (בול, כיוון, פספוס או לא ניחשת) ובתזכורת לנחש. כל פעם הודעה אחרת, באקראי 🎲'},
   {sel:'#gear',t:'⚙️ הגדרות',b:'התראות, תזכורת לנחש, התראות אחרי משחק, ערכת נושא (בית או חוץ), שם תצוגה, וגם הסיור הזה, אם תרצה לעבור עליו שוב.'},
   {t:'🎯 זהו, אתה מוכן!',b:'בהצלחה, ושיהיה בול! 💙❤️'}];
 const tourNew=()=>[
-  {t:'🆕 מה חדש במלך התחזיות',b:'מעכשיו, אחרי כל משחק, מגיעה הודעה אישית על הניחוש שלך: פרגון על בול 🎯, עקיצה קטנה על פספוס 🙈, ודחיפה לקחת סיכון אחרי כמה כיוונים ברצף ➡️. ככל שהרצף ארוך יותר, ההודעה חזקה יותר 🔥'},
-  {sel:'#gear',t:'⚙️ הגדרות נפרדות',b:'בהגדרות יש עכשיו "התראות אחרי משחק", בנפרד מהתזכורת לנחש. אפשר לכבות את כולן, או רק סוג אחד (בול, פספוס או כיוונים).'+(PS==='on'?'':' כדי לקבל אותן צריך להפעיל קודם את ההתראות (🔔) באותו מסך.')},
+  {t:'🆕 מה חדש: הודעות קוליות 🗣️',b:'מעכשיו האפליקציה גם מדברת! אחרי כל משחק תשמע הודעה קולית מהחבר׳ה לפי הניחוש שלך: בול 🎯, כיוון ➡️, פספוס 🙈, או אם לא ניחשת בכלל 😤. כל פעם הודעה אחרת, באקראי 🎲'},
+  {t:'⏰ גם בתזכורת',b:'אם המשחק מתקרב ועוד לא ניחשת, תשמע הודעה קולית שתזכיר לך (לפי זמן התזכורת שבחרת בהגדרות).'},
+  {t:'🔊 איך שומעים',b:'ההודעות נשמעות כשהאפליקציה פתוחה. אם הטלפון חוסם צליל, יופיע כפתור "יש לך הודעה קולית", ונגיעה בכל מקום במסך משמיעה אותה. כדאי להוריד את מצב השקט 😉'},
+  {sel:'#sbtn',t:'🔇 השתקה',b:'לא מתאים לך עכשיו? כאן אפשר להשתיק את ההודעות הקוליות, בנפרד משאר הצלילים.'},
   {sel:'#gear',t:'🧭 סיור באפליקציה',b:'רוצה לעבור על כל האפליקציה מההתחלה? בהגדרות יש "סיור באפליקציה", ואפשר להפעיל אותו מתי שרוצים.'}];
 function tour(steps,onEnd){
   document.getElementById('tour')?.remove();
@@ -526,9 +530,10 @@ function markTour(){
   me.tour_version=TOUR_V;sb.rpc('set_tour_seen',{p_version:TOUR_V}).then(({error})=>{if(error)console.warn(error)});
 }
 function maybeTour(){
-  if(seenTour()>=TOUR_V)return;
+  if(seenTour()>=TOUR_V)return false;
   const isNew=!D.guesses.some(g=>g.user_id===me.id);   // never guessed: the full tour; otherwise only what's new
-  setTimeout(()=>{if(!document.getElementById('tour'))tour(isNew?TOUR_FULL:tourNew(),markTour)},700);
+  setTimeout(()=>{if(!document.getElementById('tour'))tour(isNew?TOUR_FULL:tourNew(),()=>{markTour();checkVoices()});else checkVoices()},700);
+  return true;
 }
 const NOTE={exact:'מדויק',direction:'כיוון',miss:'פספוס'};
 function playerHtml(id){
