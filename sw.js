@@ -1,6 +1,6 @@
 // Service worker: network-first for the app's own files (so updates arrive fast),
 // cached copy as an offline fallback. API calls and CDN scripts are never touched.
-const CACHE = "melech-v13";
+const CACHE = "melech-v14";
 const SHELL = [
   "./",
   "index.html",
@@ -72,7 +72,7 @@ self.addEventListener("push", (e) => {
         data: { url: d.url || "./" },
       })
       .then(() => clients.matchAll({ type: "window" }))
-      .then((list) => list.forEach((c) => c.postMessage({ type: "push" }))),
+      .then((list) => list.forEach((c) => c.postMessage({ type: "push", tag: d.tag }))),
   );
 });
 self.addEventListener("notificationclick", (e) => {
